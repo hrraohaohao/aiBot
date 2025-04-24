@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "测试环境",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_BASE_URL=https://api-dev.example.com",
+                "--dart-define=ENVIRONMENT_NAME=测试环境"
+            ]
+        },
+        {
+            "name": "预发环境",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_BASE_URL=https://api-staging.example.com",
+                "--dart-define=ENVIRONMENT_NAME=预发环境"
+            ]
+        },
+        {
+            "name": "生产环境",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_BASE_URL=https://api.example.com",
+                "--dart-define=ENVIRONMENT_NAME=生产环境"
+            ]
+        }
+    ]
+} 

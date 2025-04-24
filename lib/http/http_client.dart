@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../config/env_config.dart';
 import 'interceptors/logging_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/header_interceptor.dart';
@@ -20,7 +21,7 @@ class HttpClient {
   void _initDio() {
     // 基础配置
     dio.options = BaseOptions(
-      baseUrl: '', // 设置你的基础URL
+      baseUrl: EnvConfig.apiBaseUrl, // 使用环境配置中的API地址
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 10),

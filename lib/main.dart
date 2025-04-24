@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'config/env_config.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,8 +32,27 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(title: 'Flutter Demo Home Page - ${EnvConfig.environmentName}'),
+      builder: (context, child) {
+        return Banner(
+          location: BannerLocation.topEnd,
+          message: EnvConfig.environmentName,
+          color: _getEnvironmentColor(),
+          child: child!,
+        );
+      },
     );
+  }
+  
+  // 根据环境返回不同颜色
+  Color _getEnvironmentColor() {
+    if (EnvConfig.isProduction) {
+      return Colors.green;
+    } else if (EnvConfig.isStaging) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
   }
 }
 
