@@ -1,32 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'login_controller.dart';
-import 'register_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   final LoginController _controller = LoginController();
-  bool _obscurePassword = true;
   bool _agreeTerms = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
   
-  // 处理登录
-  Future<void> _handleLogin() async {
+  // 处理下一步
+  Future<void> _handleNextStep() async {
     if (!_agreeTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请阅读并同意用户协议和隐私政策')),
@@ -35,7 +31,6 @@ class _LoginPageState extends State<LoginPage> {
     }
     
     final phone = _phoneController.text.trim();
-    final password = _passwordController.text;
     
     if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -44,9 +39,10 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     
-    if (password.isEmpty) {
+    // 手机号格式验证
+    if (phone.length != 11 || !phone.startsWith('1')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入密码')),
+        const SnackBar(content: Text('请输入有效的手机号')),
       );
       return;
     }
@@ -57,46 +53,37 @@ class _LoginPageState extends State<LoginPage> {
     });
     
     try {
-      // 调用登录控制器
-      final success = await _controller.login(phone, password);
+      // 这里模拟发送验证码的网络请求
+      await Future.delayed(const Duration(seconds: 1));
       
-      if (success) {
-        // 登录成功
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('登录成功')),
-          );
-          // TODO: 导航到主页
-        }
-      } else {
-        // 登录失败
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('用户名或密码错误')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('登录失败: $e')),
-        );
-      }
-    } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        
+        // 导航到验证码页面
+        Navigator.pushNamed(
+          context, 
+          '/verification',
+          arguments: {'phone': phone}
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e')),
+        );
       }
     }
   }
   
-  // 处理注册
-  void _handleRegister() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RegisterPage()),
-    );
+  // 返回登录页
+  void _backToLogin() {
+    Navigator.pop(context);
   }
   
   // 显示用户协议
@@ -129,6 +116,14 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: _backToLogin,
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -137,7 +132,7 @@ class _LoginPageState extends State<LoginPage> {
               constraints: BoxConstraints(
                 minHeight: MediaQuery.of(context).size.height - 
                           MediaQuery.of(context).padding.top - 
-                          MediaQuery.of(context).padding.bottom - 40,
+                          MediaQuery.of(context).padding.bottom - 80,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -146,10 +141,10 @@ class _LoginPageState extends State<LoginPage> {
                   // 顶部内容
                   Column(
                     children: [
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 40),
                       const Center(
                         child: Text(
-                          '欢迎使用小Xin机器人',
+                          '注册小Xin账号',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -173,40 +168,12 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 15),
-                      // 密码输入框
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: TextField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: '密码',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 15),
-                            border: InputBorder.none,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 60),
-                      // 登录按钮
+                      // 下一步按钮
                       SizedBox(
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
+                          onPressed: _isLoading ? null : _handleNextStep,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
@@ -224,16 +191,10 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 )
                               : const Text(
-                                  '登录',
+                                  '下一步',
                                   style: TextStyle(fontSize: 18),
                                 ),
                         ),
-                      ),
-                      const SizedBox(height: 15),
-                      // 注册账号链接
-                      TextButton(
-                        onPressed: _handleRegister,
-                        child: const Text('注册账号'),
                       ),
                     ],
                   ),
