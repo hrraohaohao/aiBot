@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_controller.dart';
+import '../../http/services/user_service.dart';
 
 class SetPasswordPage extends StatefulWidget {
   final String phoneNumber;
@@ -102,17 +103,32 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     });
     
     try {
-      // 模拟注册请求
-      await Future.delayed(const Duration(seconds: 1));
+      // 调用实际的注册接口
+      final userService = UserService();
+      await userService.init(); // 确保服务已初始化
+      
+      final response = await userService.userRegister(
+        username: widget.phoneNumber,
+        password: _passwordController.text,
+        captcha: "1234", // 这里需要替换为实际获取的验证码
+        captchaId: "temp-captcha-id", // 这里需要替换为实际的验证码ID
+      );
       
       if (mounted) {
-        // 注册成功，返回登录页并显示提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('注册成功，请登录')),
-        );
-        
-        // 返回到登录页面（清除导航栈）
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        if (response.success) {
+          // 注册成功，返回登录页并显示提示
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('注册成功，请登录')),
+          );
+          
+          // 返回到登录页面（清除导航栈）
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        } else {
+          // 注册失败，显示错误信息
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('注册失败: ${response.message}')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

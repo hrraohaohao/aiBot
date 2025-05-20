@@ -5,7 +5,7 @@ class ApiResponse<T> {
   final bool success;
 
   ApiResponse({
-    required this.code,
+    this.code = 200,
     required this.message,
     this.data,
     required this.success,
