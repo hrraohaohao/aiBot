@@ -10,6 +10,9 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
+// 声明一个常量颜色，确保在整个文件中使用相同的颜色
+const Color kPrimaryColor = Color(0xFF3C8BFF);
+
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -17,12 +20,35 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _agreeTerms = false;
   bool _isLoading = false;
+  bool _isInputValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_validateInput);
+    _passwordController.addListener(_validateInput);
+  }
 
   @override
   void dispose() {
+    _phoneController.removeListener(_validateInput);
+    _passwordController.removeListener(_validateInput);
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+  
+  // 验证输入
+  void _validateInput() {
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+    final isValid = phone.isNotEmpty && password.isNotEmpty;
+    
+    if (isValid != _isInputValid) {
+      setState(() {
+        _isInputValid = isValid;
+      });
+    }
   }
   
   // 处理登录
@@ -273,7 +299,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         
-                        const SizedBox(height: 78),
+                        const SizedBox(height: 75),
                         
                         // 登录按钮
                         Container(
@@ -282,12 +308,14 @@ class _LoginPageState extends State<LoginPage> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3C8BFF),
+                              backgroundColor: kPrimaryColor.withOpacity(_isInputValid ? 1.0 : 0.5),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(25),
                               ),
                               elevation: 0,
+                              disabledBackgroundColor: kPrimaryColor.withOpacity(0.5),
+                              disabledForegroundColor: Colors.white,
                             ),
                             child: _isLoading 
                                 ? const SizedBox(
@@ -302,6 +330,27 @@ class _LoginPageState extends State<LoginPage> {
                                     '登录',
                                     style: TextStyle(fontSize: 16),
                                   ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // 去注册文字
+                        Center(
+                          child: TextButton(
+                            onPressed: _handleRegister,
+                            style: TextButton.styleFrom(
+                              minimumSize: Size.zero,
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              '去注册',
+                              style: TextStyle(
+                                color: Color(0xFF3C8BFF),
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -321,15 +370,22 @@ class _LoginPageState extends State<LoginPage> {
                           checkboxTheme: CheckboxThemeData(
                             fillColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
                               if (states.contains(MaterialState.selected)) {
-                                return const Color(0xFF6979FF); // 选中时的填充色
+                                return kPrimaryColor;
                               }
-                              return Colors.transparent; // 未选中时透明
+                              return Colors.transparent;
                             }),
+                            shape: const CircleBorder(),
                           ),
                         ),
                         child: Checkbox(
                           value: _agreeTerms,
-                          side: const BorderSide(color: Color(0xFF999999)), // 边框颜色改为蓝色
+                          side: const BorderSide(color: Color(0xFF999999)),
+                          checkColor: Colors.white,
+                          overlayColor: MaterialStateProperty.resolveWith<Color>(
+                            (Set<MaterialState> states) => Colors.transparent
+                          ),
+                          splashRadius: 0,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           onChanged: (value) {
                             setState(() {
                               _agreeTerms = value ?? false;

@@ -9,16 +9,39 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
+// 声明一个常量颜色，确保在整个文件中使用相同的颜色
+const Color kPrimaryColor = Color(0xFF3C8BFF);
+
 class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _phoneController = TextEditingController();
   final LoginController _controller = LoginController();
   bool _agreeTerms = false;
   bool _isLoading = false;
+  bool _isInputValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_validateInput);
+  }
 
   @override
   void dispose() {
+    _phoneController.removeListener(_validateInput);
     _phoneController.dispose();
     super.dispose();
+  }
+  
+  // 验证输入
+  void _validateInput() {
+    final phone = _phoneController.text.trim();
+    final isValid = phone.isNotEmpty;
+    
+    if (isValid != _isInputValid) {
+      setState(() {
+        _isInputValid = isValid;
+      });
+    }
   }
   
   // 处理下一步
@@ -116,110 +139,198 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: _backToLogin,
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - 
-                          MediaQuery.of(context).padding.top - 
-                          MediaQuery.of(context).padding.bottom - 80,
+      body: Stack(
+        children: [
+          // 渐变背景
+          Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF596BFF),
+                  Color(0xFF6DA2FF),
+                  Color(0xFFFFFFFF),
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 顶部内容
-                  Column(
-                    children: [
-                      const SizedBox(height: 40),
-                      const Center(
-                        child: Text(
-                          '注册小Xin账号',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+            ),
+          ),
+          // 底部纯白色背景
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.7 - 1,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              color: Colors.white,
+            ),
+          ),
+          // 内容区域
+          SafeArea(
+            child: Column(
+              children: [
+                // 顶部内容区域
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 40),
+                        // 标题
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hi, 你来啦~',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                '未注册的手机号验证后自动登录',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 60),
-                      // 手机号输入框
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: TextField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            hintText: '手机号',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 15),
-                            border: InputBorder.none,
+                        
+                        const SizedBox(height: 75),
+                        
+                        // 手机号输入框
+                        Container(
+                          height: 52,
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(15),
+                                child: Image.asset(
+                                  'assets/images/icon_ipone.png',
+                                  width: 26,
+                                  height: 26,
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(
+                                    hintText: '请输入手机号码',
+                                    hintStyle: TextStyle(color: Colors.grey),
+                                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                                    border: InputBorder.none,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // 底部区域 - 包含按钮和协议
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 下一步按钮
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 40),
+                      height: 52,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleNextStep,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor.withOpacity(_isInputValid ? 1.0 : 0.5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          elevation: 0,
+                          disabledBackgroundColor: kPrimaryColor.withOpacity(0.5),
+                          disabledForegroundColor: Colors.white,
+                        ),
+                        child: _isLoading 
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                '下一步',
+                                style: TextStyle(fontSize: 16),
+                              ),
                       ),
-                      const SizedBox(height: 60),
-                      // 下一步按钮
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleNextStep,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                    ),
+                    
+                    // 底部协议
+                    Padding(
+                      padding: const EdgeInsets.only(top: 28, bottom: 26, left: 47, right: 47),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Theme(
+                            data: ThemeData(
+                              checkboxTheme: CheckboxThemeData(
+                                fillColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+                                  if (states.contains(MaterialState.selected)) {
+                                    return kPrimaryColor;
+                                  }
+                                  return Colors.transparent;
+                                }),
+                                shape: const CircleBorder(),
+                              ),
+                            ),
+                            child: Checkbox(
+                              value: _agreeTerms,
+                              side: const BorderSide(color: Color(0xFF999999)),
+                              checkColor: Colors.white,
+                              overlayColor: MaterialStateProperty.resolveWith<Color>(
+                                (Set<MaterialState> states) => Colors.transparent
+                              ),
+                              splashRadius: 0,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              onChanged: (value) {
+                                setState(() {
+                                  _agreeTerms = value ?? false;
+                                });
+                              },
                             ),
                           ),
-                          child: _isLoading 
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  '下一步',
-                                  style: TextStyle(fontSize: 18),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  // 底部协议
-                  Padding(
-                    padding: const EdgeInsets.only(top: 30, bottom: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Checkbox(
-                          value: _agreeTerms,
-                          onChanged: (value) {
-                            setState(() {
-                              _agreeTerms = value ?? false;
-                            });
-                          },
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 12),
+                          Expanded(
                             child: RichText(
                               text: TextSpan(
                                 text: '我已阅读并同意 ',
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(color: Color(0xFF999999), fontSize: 12),
                                 children: [
                                   _buildLinkTextSpan('《用户协议》', _showUserAgreement),
                                   const TextSpan(text: '、'),
@@ -230,15 +341,15 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -248,7 +359,9 @@ class _RegisterPageState extends State<RegisterPage> {
     return TextSpan(
       text: text,
       style: const TextStyle(
-        color: Colors.blue,
+        color: Color(0xFF6979FF),
+        decoration: TextDecoration.underline,
+        fontSize: 12,
       ),
       recognizer: TapGestureRecognizer()..onTap = onTap,
     );
