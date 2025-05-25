@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import '../../../pages/device/bot_connect_page.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -13,6 +14,14 @@ class _HomeTabState extends State<HomeTab> {
   final String _userName = '饺子';
   // 是否有机器人
   final bool _hasRobots = false;
+  // 输入控制器
+  final TextEditingController _familyNameController = TextEditingController();
+  
+  @override
+  void dispose() {
+    _familyNameController.dispose();
+    super.dispose();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -104,11 +113,127 @@ class _HomeTabState extends State<HomeTab> {
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
-              // TODO: 添加家庭成员
+              // 显示新建家庭/班级对话框
+              _showCreateFamilyDialog();
             },
           ),
         ],
       ),
+    );
+  }
+  
+  // 显示新建家庭/班级对话框
+  void _showCreateFamilyDialog() {
+    // 重置输入控制器
+    _familyNameController.clear();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false, // 点击外部不关闭
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 标题
+                const Center(
+                  child: Text(
+                    '新建家庭/班级',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // 输入框
+                TextField(
+                  controller: _familyNameController,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    hintText: '请输入家庭/班级名称',
+                    hintStyle: TextStyle(color: Colors.grey.shade500),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // 按钮区
+                Row(
+                  children: [
+                    // 取消按钮
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF5F5F5),
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          '取消',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    
+                    // 确认按钮
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final familyName = _familyNameController.text.trim();
+                          if (familyName.isNotEmpty) {
+                            // TODO: 处理创建家庭/班级逻辑
+                            print('创建家庭/班级: $familyName');
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3C8BFF),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          '确认',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
   
@@ -152,7 +277,10 @@ class _HomeTabState extends State<HomeTab> {
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                // TODO: 添加机器人
+                // 导航到机器人连接页面
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const BotConnectPage()),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3C8BFF),
