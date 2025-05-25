@@ -229,7 +229,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               Container(
                                 padding: const EdgeInsets.all(15),
                                 child: Image.asset(
-                                  'assets/images/icon_ipone.png',
+                                  'assets/images/icon_iphone.png',
                                   width: 26,
                                   height: 26,
                                 ),

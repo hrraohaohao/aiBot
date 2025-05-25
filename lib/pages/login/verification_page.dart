@@ -14,12 +14,15 @@ class VerificationPage extends StatefulWidget {
   State<VerificationPage> createState() => _VerificationPageState();
 }
 
+// 声明一个常量颜色，确保在整个文件中使用相同的颜色
+const Color kPrimaryColor = Color(0xFF3C8BFF);
+
 class _VerificationPageState extends State<VerificationPage> {
   final List<TextEditingController> _controllers = List.generate(
-    6, (_) => TextEditingController()
+    4, (_) => TextEditingController()
   );
   final List<FocusNode> _focusNodes = List.generate(
-    6, (_) => FocusNode()
+    4, (_) => FocusNode()
   );
   
   final LoginController _controller = LoginController();
@@ -27,6 +30,8 @@ class _VerificationPageState extends State<VerificationPage> {
   bool _isLoading = false;
   int _countdown = 60;
   Timer? _timer;
+  bool _hasError = false;
+  String _errorMessage = '';
   
   @override
   void initState() {
@@ -34,13 +39,20 @@ class _VerificationPageState extends State<VerificationPage> {
     _startCountdown();
     
     // 监听焦点变化，自动跳转到下一个输入框
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
       _controllers[i].addListener(() {
         if (_controllers[i].text.isNotEmpty) {
           _focusNodes[i + 1].requestFocus();
         }
       });
     }
+    
+    // 监听最后一个输入框，当输入完成后自动验证
+    _controllers.last.addListener(() {
+      if (_controllers.last.text.isNotEmpty && _isCodeComplete) {
+        _handleVerification();
+      }
+    });
     
     // 自动聚焦第一个输入框
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -73,14 +85,27 @@ class _VerificationPageState extends State<VerificationPage> {
     });
   }
   
+  // 清空所有输入框
+  void _clearInputs() {
+    for (var controller in _controllers) {
+      controller.clear();
+    }
+    // 聚焦到第一个输入框
+    _focusNodes[0].requestFocus();
+  }
+  
   // 重新发送验证码
   void _resendCode() {
     if (_countdown > 0) return;
     
     setState(() {
       _countdown = 60;
+      _hasError = false;
       _startCountdown();
     });
+    
+    // 清空所有输入框
+    _clearInputs();
     
     // TODO: 调用发送验证码API
     ScaffoldMessenger.of(context).showSnackBar(
@@ -106,22 +131,33 @@ class _VerificationPageState extends State<VerificationPage> {
   // 处理验证码确认
   Future<void> _handleVerification() async {
     if (!_isCodeComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入完整的验证码')),
-      );
+      setState(() {
+        _hasError = true;
+        _errorMessage = '请输入完整的验证码';
+      });
       return;
     }
     
     setState(() {
       _isLoading = true;
+      _hasError = false;
     });
     
     try {
       // 模拟验证码验证过程
       await Future.delayed(const Duration(seconds: 1));
       
+      // 检查验证码是否为1111
+      if (_fullCode != '1111') {
+        setState(() {
+          _hasError = true;
+          _errorMessage = '验证码输入错误，请重新输入';
+          _isLoading = false;
+        });
+        return;
+      }
+      
       if (mounted) {
-        // 这里假设验证码始终正确，实际应用中应该调用API验证
         // 导航到设置密码页面
         Navigator.pushNamed(
           context, 
@@ -131,9 +167,10 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('验证失败: $e')),
-        );
+        setState(() {
+          _hasError = true;
+          _errorMessage = '验证失败: $e';
+        });
       }
     } finally {
       if (mounted) {
@@ -147,132 +184,221 @@ class _VerificationPageState extends State<VerificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
           },
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const Center(
-                child: Text(
-                  '验证手机号',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+      body: Stack(
+        children: [
+          // 渐变背景
+          Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF596BFF),
+                  Color(0xFF6DA2FF),
+                  Color(0xFFFFFFFF),
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-              const SizedBox(height: 30),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  '验证码已发送至：${widget.phoneNumber}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 50),
-              
-              // 验证码输入框
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(
-                    6,
-                    (index) => SizedBox(
-                      width: 45,
-                      height: 55,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: TextField(
-                          controller: _controllers[index],
-                          focusNode: _focusNodes[index],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 22),
-                          maxLength: 1,
-                          decoration: const InputDecoration(
-                            counterText: '',
-                            border: InputBorder.none,
+            ),
+          ),
+          // 底部纯白色背景
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.7 - 1,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              color: Colors.white,
+            ),
+          ),
+          // 内容区域
+          SafeArea(
+            child: Column(
+              children: [
+                // 顶部内容区域
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 40),
+                        // 标题
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '输入验证码',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '我们已向 +${widget.phoneNumber} 发送验证码',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const Text(
+                                '请查看短信并输入验证码',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
-                          onChanged: (value) {
-                            // 自动跳转到上一个输入框
-                            if (value.isEmpty && index > 0) {
-                              _focusNodes[index - 1].requestFocus();
-                            }
-                          },
+                        ),
+                        
+                        const SizedBox(height: 50),
+                        
+                        // 验证码输入框
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(
+                              4,
+                              (index) => SizedBox(
+                                width: 70,
+                                height: 70,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextField(
+                                    controller: _controllers[index],
+                                    focusNode: _focusNodes[index],
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                                    maxLength: 1,
+                                    decoration: const InputDecoration(
+                                      counterText: '',
+                                      border: InputBorder.none,
+                                    ),
+                                    onChanged: (value) {
+                                      // 自动跳转到上一个输入框
+                                      if (value.isEmpty && index > 0) {
+                                        _focusNodes[index - 1].requestFocus();
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // 底部区域 - 包含错误提示和按钮
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 验证码输入错误提示 - 只在有错误时显示
+                    if (_hasError)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Center(
+                          child: Text(
+                            _errorMessage,
+                            style: const TextStyle(
+                              color: Color(0xFF999999),
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
+                    
+                    // 重新发送按钮（60s倒计时）
+                    Container(
+                      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 88),
+                      height: 52,
+                      child: _countdown > 0
+                          ? ElevatedButton(
+                              onPressed: null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryColor.withOpacity(0.5),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
+                                elevation: 0,
+                                disabledBackgroundColor: kPrimaryColor.withOpacity(0.5),
+                                disabledForegroundColor: Colors.white,
+                              ),
+                              child: Text(
+                                '重新发送 (${_countdown}s)',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: _resendCode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                '重新发送验证码',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // 重新发送按钮
-              Center(
-                child: TextButton(
-                  onPressed: _countdown > 0 ? null : _resendCode,
-                  child: Text(
-                    _countdown > 0 ? '$_countdown秒后可重新发送' : '重新发送验证码',
-                    style: TextStyle(
-                      color: _countdown > 0 ? Colors.grey : Colors.blue,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const Spacer(),
-              
-              // 确认按钮
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleVerification,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  child: _isLoading 
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          '确认',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          
+          // 加载指示器
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.1),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: kPrimaryColor,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
