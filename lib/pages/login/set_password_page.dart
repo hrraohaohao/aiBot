@@ -14,6 +14,9 @@ class SetPasswordPage extends StatefulWidget {
   State<SetPasswordPage> createState() => _SetPasswordPageState();
 }
 
+// 声明一个常量颜色，确保在整个文件中使用相同的颜色
+const Color kPrimaryColor = Color(0xFF3C8BFF);
+
 class _SetPasswordPageState extends State<SetPasswordPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
@@ -24,12 +27,34 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   bool _isLoading = false;
   String? _passwordError;
   String? _confirmPasswordError;
+  bool _isInputValid = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_validateInput);
+    _confirmPasswordController.addListener(_validateInput);
+  }
   
   @override
   void dispose() {
+    _passwordController.removeListener(_validateInput);
+    _confirmPasswordController.removeListener(_validateInput);
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+  
+  // 检查输入是否有效
+  void _validateInput() {
+    final password = _passwordController.text;
+    final isValid = password.isNotEmpty;
+    
+    if (isValid != _isInputValid) {
+      setState(() {
+        _isInputValid = isValid;
+      });
+    }
   }
   
   // 验证密码
@@ -43,9 +68,9 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       return false;
     }
     
-    if (password.length != 8) {
+    if (password.length < 6 || password.length > 16) {
       setState(() {
-        _passwordError = '密码必须为8位';
+        _passwordError = '密码长度应为6-16位';
       });
       return false;
     }
@@ -91,9 +116,8 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     
     // 验证密码
     final isPasswordValid = _validatePassword();
-    final isConfirmPasswordValid = _validateConfirmPassword();
     
-    if (!isPasswordValid || !isConfirmPasswordValid) {
+    if (!isPasswordValid) {
       return;
     }
     
@@ -110,7 +134,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       final response = await userService.userRegister(
         username: widget.phoneNumber,
         password: _passwordController.text,
-        captcha: "1234", // 这里需要替换为实际获取的验证码
+        captcha: "1111", // 这里需要替换为实际获取的验证码
         captchaId: "temp-captcha-id", // 这里需要替换为实际的验证码ID
       );
       
@@ -148,184 +172,193 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
           },
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const Center(
-                child: Text(
-                  '设置密码',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+      body: Stack(
+        children: [
+          // 渐变背景
+          Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF596BFF),
+                  Color(0xFF6DA2FF),
+                  Color(0xFFFFFFFF),
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  '请为账号 ${widget.phoneNumber} 设置登录密码',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 50),
-              
-              // 密码输入框
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _passwordError != null ? Colors.red : Colors.grey.shade300
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: '请输入8位密码',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-                    border: InputBorder.none,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                  textAlignVertical: TextAlignVertical.center,
-                  onChanged: (_) {
-                    // 输入变化时清除错误
-                    if (_passwordError != null) {
-                      setState(() {
-                        _passwordError = null;
-                      });
-                    }
-                  },
-                ),
-              ),
-              
-              // 密码错误提示
-              if (_passwordError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 15, top: 5),
-                  child: Text(
-                    _passwordError!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              
-              const SizedBox(height: 20),
-              
-              // 确认密码输入框
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _confirmPasswordError != null ? Colors.red : Colors.grey.shade300
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirmPassword,
-                  decoration: InputDecoration(
-                    hintText: '请再次输入密码',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-                    border: InputBorder.none,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        });
-                      },
-                    ),
-                  ),
-                  textAlignVertical: TextAlignVertical.center,
-                  onChanged: (_) {
-                    // 输入变化时清除错误
-                    if (_confirmPasswordError != null) {
-                      setState(() {
-                        _confirmPasswordError = null;
-                      });
-                    }
-                  },
-                ),
-              ),
-              
-              // 确认密码错误提示
-              if (_confirmPasswordError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 15, top: 5),
-                  child: Text(
-                    _confirmPasswordError!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              
-              const Spacer(),
-              
-              // 完成按钮
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleRegister,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  child: _isLoading 
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          '完成',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          // 底部纯白色背景
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.7 - 1,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              color: Colors.white,
+            ),
+          ),
+          // 内容区域
+          SafeArea(
+            child: Column(
+              children: [
+                // 顶部内容区域
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 40),
+                        // 标题
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '设置密码',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                '设置密码 完成注册',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 50),
+                        
+                        // 密码输入框
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(15),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  child: Image.asset(
+                                    _obscurePassword 
+                                        ? 'assets/images/icon_password_hide.png'
+                                        : 'assets/images/icon_password_show.png',
+                                    width: 26,
+                                    height: 26,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: const InputDecoration(
+                                    hintText: '6-16位字母/数字/符号密码',
+                                    hintStyle: TextStyle(color: Colors.grey),
+                                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                                    border: InputBorder.none,
+                                  ),
+                                  onChanged: (_) {
+                                    // 输入变化时清除错误
+                                    if (_passwordError != null) {
+                                      setState(() {
+                                        _passwordError = null;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // 密码错误提示
+                        if (_passwordError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 50, top: 8),
+                            child: Text(
+                              _passwordError!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // 底部区域 - 包含按钮
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 完成注册按钮
+                    Container(
+                      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 88),
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isInputValid ? (_isLoading ? null : _handleRegister) : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(26),
+                          ),
+                          elevation: 0,
+                          disabledBackgroundColor: kPrimaryColor.withOpacity(0.5),
+                          disabledForegroundColor: Colors.white,
+                        ),
+                        child: _isLoading 
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                '完成注册',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
