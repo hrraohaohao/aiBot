@@ -129,155 +129,236 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - 
-                          MediaQuery.of(context).padding.top - 
-                          MediaQuery.of(context).padding.bottom - 40,
+      body: Stack(
+        children: [
+          // 渐变背景
+          Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF596BFF),
+                  Color(0xFF6DA2FF),
+                  Color(0xFFFFFFFF),
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 顶部内容
-                  Column(
-                    children: [
-                      const SizedBox(height: 60),
-                      const Center(
-                        child: Text(
-                          '欢迎使用小Xin机器人',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 60),
-                      // 手机号输入框
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: TextField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            hintText: '手机号',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 15),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      // 密码输入框
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: TextField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: '密码',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 15),
-                            border: InputBorder.none,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 60),
-                      // 登录按钮
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          child: _isLoading 
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  '登录',
-                                  style: TextStyle(fontSize: 18),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      // 注册账号链接
-                      TextButton(
-                        onPressed: _handleRegister,
-                        child: const Text('注册账号'),
-                      ),
-                    ],
-                  ),
-                  
-                  // 底部协议
-                  Padding(
-                    padding: const EdgeInsets.only(top: 30, bottom: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+          // 底部纯白色背景
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.7 - 1,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              color: Colors.white,
+            ),
+          ),
+          // 内容区域
+          SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // 顶部内容区域
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Checkbox(
+                        const SizedBox(height: 40),
+                        // 标题
+                        const Center(
+                          child: Text(
+                            '欢迎使用小xin机器人',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        // 中间图标区域
+                        Container(
+                          height: 200,
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/icon_logo.png',
+                              width: 274,
+                              height: 274,
+                            ),
+                          ),
+                        ),
+                        
+                        // 输入框区域
+                        Container(
+                          height: 52,
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(15),
+                                child: Image.asset(
+                                  'assets/images/icon_ipone.png',
+                                  width: 26,
+                                  height: 26,
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(
+                                    hintText: '请输入手机号码',
+                                    hintStyle: TextStyle(color: Colors.grey),
+                                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                                    border: InputBorder.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // 密码输入框
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(15),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  child: Image.asset(
+                                    _obscurePassword 
+                                        ? 'assets/images/icon_password_hide.png'
+                                        : 'assets/images/icon_password_show.png',
+                                    width: 26,
+                                    height: 26,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: const InputDecoration(
+                                    hintText: '请输入密码',
+                                    hintStyle: TextStyle(color: Colors.grey),
+                                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                                    border: InputBorder.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 78),
+                        
+                        // 登录按钮
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3C8BFF),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading 
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    '登录',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // 底部协议 - 固定在底部
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 26, left: 47, right: 47),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Theme(
+                        data: ThemeData(
+                          checkboxTheme: CheckboxThemeData(
+                            fillColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+                              if (states.contains(MaterialState.selected)) {
+                                return const Color(0xFF6979FF); // 选中时的填充色
+                              }
+                              return Colors.transparent; // 未选中时透明
+                            }),
+                          ),
+                        ),
+                        child: Checkbox(
                           value: _agreeTerms,
+                          side: const BorderSide(color: Color(0xFF999999)), // 边框颜色改为蓝色
                           onChanged: (value) {
                             setState(() {
                               _agreeTerms = value ?? false;
                             });
                           },
                         ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: RichText(
-                              text: TextSpan(
-                                text: '我已阅读并同意 ',
-                                style: const TextStyle(color: Colors.black),
-                                children: [
-                                  _buildLinkTextSpan('《用户协议》', _showUserAgreement),
-                                  const TextSpan(text: '、'),
-                                  _buildLinkTextSpan('《隐私政策》', _showPrivacyPolicy),
-                                  const TextSpan(text: '、'),
-                                  _buildLinkTextSpan('《未成年人个人信息保护规则》', _showChildProtection),
-                                ],
-                              ),
-                            ),
+                      ),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            text: '我已阅读并同意 ',
+                            style: const TextStyle(color: Color(0xFF999999), fontSize: 12),
+                            children: [
+                              _buildLinkTextSpan('《用户协议》', _showUserAgreement),
+                              const TextSpan(text: '、'),
+                              _buildLinkTextSpan('《隐私政策》', _showPrivacyPolicy),
+                              const TextSpan(text: '、'),
+                              _buildLinkTextSpan('《未成年人个人信息保护规则》', _showChildProtection),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -287,7 +368,9 @@ class _LoginPageState extends State<LoginPage> {
     return TextSpan(
       text: text,
       style: const TextStyle(
-        color: Colors.blue,
+        color: Color(0xFF6979FF),
+        decoration: TextDecoration.underline,
+        fontSize: 12,
       ),
       recognizer: TapGestureRecognizer()..onTap = onTap,
     );
