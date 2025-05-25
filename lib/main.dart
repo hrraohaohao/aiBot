@@ -1,66 +1,106 @@
 import 'package:flutter/material.dart';
-import 'config/env_config.dart';
-import 'routes/app_routes.dart';
+import 'package:flutter/services.dart';
+import 'pages/login/login_page.dart';
+import 'pages/main/main_page.dart';
+import 'utils/token_manager.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 设置状态栏透明
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+  
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '小Xin机器人',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+        primaryColor: const Color(0xFF3C8BFF),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF3C8BFF),
+          primary: const Color(0xFF3C8BFF),
+        ),
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          iconTheme: IconThemeData(color: Colors.black),
+          titleTextStyle: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
-      // 设置应用路由
-      initialRoute: AppRoutes.login,
-      routes: AppRoutes.routes,
-      onGenerateRoute: AppRoutes.onGenerateRoute,
-      // 环境标识
-      builder: (context, child) {
-        // 只在非生产环境显示环境标识
-        if (!EnvConfig.isProduction) {
-          return Banner(
-            location: BannerLocation.topEnd,
-            message: EnvConfig.environmentName,
-            color: _getEnvironmentColor(),
-            child: child!,
-          );
-        }
-        return child!;
+      home: const SplashScreen(),
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/main': (context) => const MainPage(),
       },
     );
   }
+}
+
+// 启动页面，用于检查登录状态并跳转
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
   
-  // 根据环境返回不同颜色
-  Color _getEnvironmentColor() {
-    if (EnvConfig.isProduction) {
-      return Colors.green;
-    } else if (EnvConfig.isStaging) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
+  // 检查登录状态，决定跳转页面
+  Future<void> _checkLoginStatus() async {
+    // 延迟一秒，模拟启动屏
+    await Future.delayed(const Duration(seconds: 1));
+    
+    // 检查是否已登录
+    final isLoggedIn = await TokenManager.isTokenValid();
+
+    if (mounted) {
+      // 根据登录状态跳转
+        Navigator.of(context).pushReplacementNamed('/main');
+      // if (isLoggedIn) {
+      // } else {
+      //   Navigator.of(context).pushReplacementNamed('/login');
+      // }
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 应用logo
+            FlutterLogo(size: 80),
+            SizedBox(height: 24),
+            // 加载指示器
+            CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
   }
 }

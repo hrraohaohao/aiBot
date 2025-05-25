@@ -1,5 +1,6 @@
 import 'api_service.dart';
 import '../models/api_response.dart';
+import '../models/login_response.dart';
 
 class UserService extends ApiService {
   // 单例模式
@@ -10,6 +11,7 @@ class UserService extends ApiService {
   // API端点
   static const String _baseUrl = 'https://admin.chat-ai.cc';
   static const String _userRegister = '/xiaozhi/user/register'; //用户注册
+  static const String _userLogin = '/xiaozhi/user/login'; //用户登录
 
   // 初始化
   Future<void> init() async {
@@ -33,6 +35,31 @@ class UserService extends ApiService {
       _userRegister,
       data: data,
       fromJson: (json) => json.toString(),
+    );
+    return response;
+  }
+
+  Future<ApiResponse<LoginResponse>> userLogin({
+    required String username,
+    required String password,
+    String? captcha,
+    String? captchaId,
+  }) async {
+    final Map<String, dynamic> data = {
+      'username': username,
+      'password': password,
+    };
+    
+    // 仅在提供了验证码时添加到请求数据中
+    if (captcha != null && captchaId != null) {
+      data['captcha'] = captcha;
+      data['captchaId'] = captchaId;
+    }
+    
+    final response = await post<LoginResponse>(
+      _userLogin,
+      data: data,
+      fromJson: (json) => LoginResponse.fromJson(json),
     );
     return response;
   }
