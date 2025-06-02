@@ -73,6 +73,50 @@ class _HomeTabState extends State<HomeTab> {
     // 这里可以添加保存用户选择的逻辑，暂时用内存保存
   }
 
+  // 创建智能体并刷新列表
+  Future<void> _createAgent(String agentName) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // 调用创建智能体接口
+      final response = await _agentService.agent(agentName: agentName);
+      
+      if (response.success) {
+        // 创建成功，显示提示
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('智能体创建成功')),
+          );
+        }
+        
+        // 刷新智能体列表
+        await _loadAgentList();
+      } else {
+        // 创建失败，显示错误信息
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('创建失败: ${response.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      // 发生异常
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建失败: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _familyNameController.dispose();
@@ -203,116 +247,139 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // 显示新建家庭/班级对话框
   void _showCreateFamilyDialog() {
-    // 重置输入控制器
     _familyNameController.clear();
+    bool isCreating = false;
 
     showDialog(
       context: context,
       barrierDismissible: false, // 点击外部不关闭
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24.0),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 标题
-                const Center(
-                  child: Text(
-                    '新建家庭/班级',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // 输入框
-                TextField(
-                  controller: _familyNameController,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFFF5F5F5),
-                    hintText: '请输入家庭/班级名称',
-                    hintStyle: TextStyle(color: Colors.grey.shade500),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // 按钮区
-                Row(
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.0),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 取消按钮
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF5F5F5),
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          '取消',
-                          style: TextStyle(fontSize: 16),
+                    // 标题
+                    const Center(
+                      child: Text(
+                        '添加智能体',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(height: 24),
 
-                    // 确认按钮
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final familyName = _familyNameController.text.trim();
-                          if (familyName.isNotEmpty) {
-                            // TODO: 处理创建家庭/班级逻辑
-                            print('创建家庭/班级: $familyName');
-                            Navigator.of(context).pop();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3C8BFF),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
+                    // 输入框
+                    TextField(
+                      controller: _familyNameController,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        hintText: '请输入智能体名称',
+                        hintStyle: TextStyle(color: Colors.grey.shade500),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
                         ),
-                        child: const Text(
-                          '确认',
-                          style: TextStyle(fontSize: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 按钮区
+                    Row(
+                      children: [
+                        // 取消按钮
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isCreating 
+                                ? null 
+                                : () {
+                                    Navigator.of(context).pop();
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF5F5F5),
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              '取消',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // 确认按钮
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isCreating 
+                                ? null 
+                                : () async {
+                                    final agentName = _familyNameController.text.trim();
+                                    if (agentName.isNotEmpty) {
+                                      // 设置加载状态
+                                      setState(() {
+                                        isCreating = true;
+                                      });
+                                      
+                                      // 关闭对话框
+                                      Navigator.of(context).pop();
+                                      
+                                      // 创建智能体
+                                      await _createAgent(agentName);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3C8BFF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: isCreating
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    '确认',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }
         );
       },
     );
