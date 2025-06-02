@@ -36,6 +36,7 @@ dependencies:
   http: ^1.1.0
   dio: ^5.8.0+1
   dio_web_adapter: ^2.1.1
+  shared_preferences: ^2.2.3
   # shared_preferences: ^2.2.2 # 暂时注释掉，解决iOS编译问题
 
 dev_dependencies:

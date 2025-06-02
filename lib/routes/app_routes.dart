@@ -1,3 +1,4 @@
+import 'package:ai_bot/pages/main/main_page.dart';
 import 'package:flutter/material.dart';
 import '../pages/login/login_page.dart';
 import '../pages/login/register_page.dart';
@@ -8,6 +9,7 @@ class AppRoutes {
   // 路由名称常量
   static const String home = '/';
   static const String login = '/login';
+  static const String main = '/main';
   static const String register = '/register';
   static const String verification = '/verification';
   static const String setPassword = '/set_password';
@@ -16,6 +18,7 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes => {
     login: (context) => const LoginPage(),
     register: (context) => const RegisterPage(),
+    main: (context) => const MainPage(),
   };
   
   // 路由生成器

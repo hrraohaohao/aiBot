@@ -67,17 +67,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
   // 检查登录状态，决定跳转页面
   Future<void> _checkLoginStatus() async {
-    // 延迟一秒，模拟启动屏
-    await Future.delayed(const Duration(seconds: 1));
-
     // 检查是否已登录
     final isLoggedIn = await TokenManager.isTokenValid();
-
+    debugPrint('isLoggedIn $isLoggedIn');
     if (mounted) {
       // 根据登录状态跳转
       if (isLoggedIn) {
+        debugPrint('登录信息有效，跳转到首页');
         Navigator.of(context).pushReplacementNamed('/main');
       } else {
+        debugPrint('登录信息无效，跳转到登录页');
         Navigator.of(context).pushReplacementNamed('/login');
       }
     }
