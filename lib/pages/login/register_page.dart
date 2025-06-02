@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'login_controller.dart';
+import '../../http/services/user_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -15,6 +16,7 @@ const Color kPrimaryColor = Color(0xFF3C8BFF);
 class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _phoneController = TextEditingController();
   final LoginController _controller = LoginController();
+  final UserService _userService = UserService();
   bool _agreeTerms = false;
   bool _isLoading = false;
   bool _isInputValid = false;
@@ -76,20 +78,29 @@ class _RegisterPageState extends State<RegisterPage> {
     });
     
     try {
-      // 这里模拟发送验证码的网络请求
-      await Future.delayed(const Duration(seconds: 1));
+      // 调用真实的发送验证码API
+      final response = await _userService.sendSmsCode(
+        phone: phone,
+      );
       
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
         
-        // 导航到验证码页面
-        Navigator.pushNamed(
-          context, 
-          '/verification',
-          arguments: {'phone': phone}
-        );
+        if (response.success) {
+          // 导航到验证码页面
+          Navigator.pushNamed(
+            context, 
+            '/verification',
+            arguments: {'phone': phone}
+          );
+        } else {
+          // 显示错误信息
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.message)),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -98,7 +109,7 @@ class _RegisterPageState extends State<RegisterPage> {
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
+          SnackBar(content: Text('发送验证码失败: $e')),
         );
       }
     }

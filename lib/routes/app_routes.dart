@@ -33,11 +33,15 @@ class AppRoutes {
         );
         
       case setPassword:
-        // 设置密码页面需要传入手机号
+        // 设置密码页面需要传入手机号和验证码
         final phone = args?['phone'] as String? ?? '';
+        final verificationCode = args?['verificationCode'] as String? ?? '';
         return MaterialPageRoute(
           settings: settings,
-          builder: (context) => SetPasswordPage(phoneNumber: phone),
+          builder: (context) => SetPasswordPage(
+            phoneNumber: phone,
+            verificationCode: verificationCode,
+          ),
         );
         
       default:

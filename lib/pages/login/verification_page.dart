@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'login_controller.dart';
+import '../../http/services/user_service.dart';
 
 class VerificationPage extends StatefulWidget {
   final String phoneNumber;
@@ -19,13 +20,14 @@ const Color kPrimaryColor = Color(0xFF3C8BFF);
 
 class _VerificationPageState extends State<VerificationPage> {
   final List<TextEditingController> _controllers = List.generate(
-    4, (_) => TextEditingController()
+    6, (_) => TextEditingController()
   );
   final List<FocusNode> _focusNodes = List.generate(
-    4, (_) => FocusNode()
+    6, (_) => FocusNode()
   );
   
   final LoginController _controller = LoginController();
+  final UserService _userService = UserService();
   
   bool _isLoading = false;
   int _countdown = 60;
@@ -39,7 +41,7 @@ class _VerificationPageState extends State<VerificationPage> {
     _startCountdown();
     
     // 监听焦点变化，自动跳转到下一个输入框
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 5; i++) {
       _controllers[i].addListener(() {
         if (_controllers[i].text.isNotEmpty) {
           _focusNodes[i + 1].requestFocus();
@@ -95,22 +97,49 @@ class _VerificationPageState extends State<VerificationPage> {
   }
   
   // 重新发送验证码
-  void _resendCode() {
+  void _resendCode() async {
     if (_countdown > 0) return;
     
     setState(() {
-      _countdown = 60;
+      _isLoading = true;
       _hasError = false;
-      _startCountdown();
     });
     
-    // 清空所有输入框
-    _clearInputs();
-    
-    // TODO: 调用发送验证码API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('验证码已重新发送')),
-    );
+    try {
+      // 调用真实API发送验证码
+      final response = await _userService.sendSmsCode(
+        phone: widget.phoneNumber,
+      );
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (response.success) {
+        setState(() {
+          _countdown = 60;
+          _startCountdown();
+        });
+        
+        // 清空所有输入框
+        _clearInputs();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('验证码已重新发送')),
+        );
+      } else {
+        setState(() {
+          _hasError = true;
+          _errorMessage = response.message;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = '发送验证码失败: $e';
+      });
+    }
   }
   
   // 验证码是否已全部填写
@@ -144,26 +173,31 @@ class _VerificationPageState extends State<VerificationPage> {
     });
     
     try {
-      // 模拟验证码验证过程
-      await Future.delayed(const Duration(seconds: 1));
+      final response = await _userService.verifySmsCode(
+        phone: widget.phoneNumber,
+        mobileCaptcha: _fullCode,
+      );
       
-      // 检查验证码是否为1111
-      if (_fullCode != '1111') {
+      if (response.success) {
+        if (mounted) {
+          // 导航到设置密码页面，同时传递电话号码和验证码
+          Navigator.pushNamed(
+            context, 
+            '/set_password',
+            arguments: {
+              'phone': widget.phoneNumber,
+              'verificationCode': _fullCode
+            }
+          );
+        }
+      } else {
+        // 验证失败
         setState(() {
           _hasError = true;
-          _errorMessage = '验证码输入错误，请重新输入';
-          _isLoading = false;
+          _errorMessage = response.message.isNotEmpty 
+              ? response.message 
+              : '验证码错误，请重新输入';
         });
-        return;
-      }
-      
-      if (mounted) {
-        // 导航到设置密码页面
-        Navigator.pushNamed(
-          context, 
-          '/set_password',
-          arguments: {'phone': widget.phoneNumber}
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -275,10 +309,10 @@ class _VerificationPageState extends State<VerificationPage> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: List.generate(
-                              4,
+                              6,
                               (index) => SizedBox(
-                                width: 70,
-                                height: 70,
+                                width: 46,
+                                height: 60,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -296,7 +330,7 @@ class _VerificationPageState extends State<VerificationPage> {
                                     focusNode: _focusNodes[index],
                                     keyboardType: TextInputType.number,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                                     maxLength: 1,
                                     decoration: const InputDecoration(
                                       counterText: '',

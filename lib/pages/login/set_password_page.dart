@@ -4,10 +4,12 @@ import '../../http/services/user_service.dart';
 
 class SetPasswordPage extends StatefulWidget {
   final String phoneNumber;
+  final String verificationCode;
   
   const SetPasswordPage({
     super.key, 
     required this.phoneNumber,
+    required this.verificationCode,
   });
 
   @override
@@ -116,8 +118,9 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     
     // 验证密码
     final isPasswordValid = _validatePassword();
+    final isConfirmPasswordValid = _validateConfirmPassword();
     
-    if (!isPasswordValid) {
+    if (!isPasswordValid || !isConfirmPasswordValid) {
       return;
     }
     
@@ -134,8 +137,8 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       final response = await userService.userRegister(
         username: widget.phoneNumber,
         password: _passwordController.text,
-        captcha: "1111", // 这里需要替换为实际获取的验证码
-        captchaId: "temp-captcha-id", // 这里需要替换为实际的验证码ID
+        captcha: widget.verificationCode, // 使用从验证码页面传来的验证码
+        captchaId: widget.phoneNumber, // 使用手机号作为captchaId
       );
       
       if (mounted) {

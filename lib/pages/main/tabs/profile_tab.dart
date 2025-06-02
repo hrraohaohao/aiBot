@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../utils/token_manager.dart';
+import '../../../utils/user_manager.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -8,6 +10,9 @@ class ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<ProfileTab> {
+  // 用户管理器
+  final UserManager _userManager = UserManager();
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,59 +82,72 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                // 头像
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue.shade100,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.person,
-                      size: 36,
-                      color: Colors.white,
+            child: ValueListenableBuilder(
+              valueListenable: _userManager.userInfoNotifier,
+              builder: (context, userInfo, _) {
+                return Row(
+                  children: [
+                    // 头像
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue.shade100,
+                        image: userInfo?.avatar != null
+                            ? DecorationImage(
+                                image: NetworkImage(userInfo!.avatar!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: userInfo?.avatar == null
+                          ? const Center(
+                              child: Icon(
+                                Icons.person,
+                                size: 36,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
                     ),
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // 用户信息
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '饺子',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    
+                    const SizedBox(width: 16),
+                    
+                    // 用户信息
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userInfo?.nickname ?? userInfo?.username ?? '未登录',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '账号: ${userInfo?.phone ?? userInfo?.username ?? '未知'}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '账号: 138****8888',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // 编辑按钮
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () {
-                    // TODO: 编辑个人信息
-                  },
-                ),
-              ],
+                    ),
+                    
+                    // 编辑按钮
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () {
+                        // TODO: 编辑个人信息
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           
@@ -176,7 +194,7 @@ class _ProfileTabState extends State<ProfileTab> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ElevatedButton(
               onPressed: () {
-                // TODO: 退出登录
+                _showLogoutConfirmation(context);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -241,6 +259,46 @@ class _ProfileTabState extends State<ProfileTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // 显示退出登录确认对话框
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认退出'),
+        content: const Text('您确定要退出登录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              // 清除token
+              await TokenManager.clearToken();
+              
+              // 清除用户信息
+              _userManager.clearUserInfo();
+              
+              if (mounted) {
+                // 关闭对话框
+                Navigator.of(context).pop();
+                
+                // 返回登录页面
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/login',
+                  (route) => false, // 清除所有路由
+                );
+              }
+            },
+            child: const Text('确认退出', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

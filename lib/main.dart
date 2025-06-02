@@ -1,12 +1,11 @@
+import 'package:ai_bot/routes/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'pages/login/login_page.dart';
-import 'pages/main/main_page.dart';
 import 'utils/token_manager.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 设置状态栏透明
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -14,7 +13,7 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  
+
   runApp(const MyApp());
 }
 
@@ -45,10 +44,8 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const SplashScreen(),
-      routes: {
-        '/login': (context) => const LoginPage(),
-        '/main': (context) => const MainPage(),
-      },
+      routes: AppRoutes.routes,
+      onGenerateRoute: AppRoutes.onGenerateRoute,
     );
   }
 }
@@ -67,22 +64,22 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     _checkLoginStatus();
   }
-  
+
   // 检查登录状态，决定跳转页面
   Future<void> _checkLoginStatus() async {
     // 延迟一秒，模拟启动屏
     await Future.delayed(const Duration(seconds: 1));
-    
+
     // 检查是否已登录
     final isLoggedIn = await TokenManager.isTokenValid();
 
     if (mounted) {
       // 根据登录状态跳转
+      if (isLoggedIn) {
         Navigator.of(context).pushReplacementNamed('/main');
-      // if (isLoggedIn) {
-      // } else {
-      //   Navigator.of(context).pushReplacementNamed('/login');
-      // }
+      } else {
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
     }
   }
 
