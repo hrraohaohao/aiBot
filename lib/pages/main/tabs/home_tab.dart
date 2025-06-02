@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../../../pages/device/bot_connect_page.dart';
 import '../../../http/models/agent_model.dart';
+import '../../../pages/agent/aibot_setting_page.dart';
 
 // 菜单项类型枚举
 enum MenuItemType {
@@ -518,9 +519,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _navigateToAgentManagement() {
-    // 跳转到智能体管理页面的逻辑
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('跳转到智能体管理页面')),
+    // 跳转到智能体管理页面
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AiBotSettingPage()),
     );
   }
 }
