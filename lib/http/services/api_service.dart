@@ -4,6 +4,7 @@ import '../exceptions/api_exception.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
 import 'package:dio/io.dart';
+import '../../utils/token_manager.dart';
 
 class ApiService {
   final HttpClient _httpClient = HttpClient();
@@ -26,6 +27,8 @@ class ApiService {
   // 设置身份验证token
   void setToken(String token) {
     _httpClient.setToken(token);
+    // 确保添加Bearer前缀
+    _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
   // 初始化 Dio 并配置
@@ -59,8 +62,21 @@ class ApiService {
       responseBody: true,
       error: true,
     ));
+    
+    // 添加请求拦截器，自动添加token
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        // 从TokenManager获取token
+        final token = await TokenManager.getToken();
+        if (token != null && token.isNotEmpty) {
+          // 添加Bearer前缀
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        return handler.next(options);
+      },
+    ));
   }
-
+  
   // GET请求
   Future<ApiResponse<T>> get<T>(
     String path, {
@@ -68,13 +84,6 @@ class ApiService {
     T Function(dynamic)? fromJson,
   }) async {
     try {
-      // 打印请求信息
-      print('┌───────────────────────────────────────────');
-      print('│ 请求方法: GET');
-      print('│ 请求地址: $_baseUrl$path');
-      print('│ 请求参数: $queryParameters');
-      print('└───────────────────────────────────────────');
-      
       final response = await _dio.get<dynamic>(
         path,
         queryParameters: queryParameters,
@@ -137,12 +146,6 @@ class ApiService {
         );
       }
     } catch (e) {
-      // 打印错误信息
-      print('┌───────────────────────────────────────────');
-      print('│ 错误类型: ${e is DioException ? e.type : e.runtimeType}');
-      print('│ 错误信息: ${e is DioException ? e.message : e}');
-      print('└───────────────────────────────────────────');
-      
       return ApiResponse<T>(
         success: false,
         code: e is DioException ? e.response?.statusCode ?? 500 : 500,
@@ -159,13 +162,6 @@ class ApiService {
     T Function(dynamic)? fromJson,
   }) async {
     try {
-      // 打印请求信息
-      print('┌───────────────────────────────────────────');
-      print('│ 请求方法: POST');
-      print('│ 请求地址: $_baseUrl$path');
-      print('│ 请求体: $data');
-      print('└───────────────────────────────────────────');
-      
       final response = await _dio.post<dynamic>(
         path,
         data: data,
@@ -229,12 +225,6 @@ class ApiService {
         );
       }
     } catch (e) {
-      // 打印错误信息
-      print('┌───────────────────────────────────────────');
-      print('│ 错误类型: ${e is DioException ? e.type : e.runtimeType}');
-      print('│ 错误信息: ${e is DioException ? e.message : e}');
-      print('└───────────────────────────────────────────');
-      
       return ApiResponse<T>(
         success: false,
         code: e is DioException ? e.response?.statusCode ?? 500 : 500,
@@ -242,190 +232,15 @@ class ApiService {
       );
     }
   }
-
-  // PUT请求
-  Future<ApiResponse<T>> put<T>(
-    String path, {
-    dynamic data,
-    Map<String, dynamic>? queryParameters,
-    T Function(dynamic)? fromJson,
-  }) async {
-    try {
-      // 打印请求信息
-      print('┌───────────────────────────────────────────');
-      print('│ 请求方法: PUT');
-      print('│ 请求地址: $_baseUrl$path');
-      print('│ 请求参数: $queryParameters');
-      print('│ 请求体: $data');
-      print('└───────────────────────────────────────────');
-      
-      final response = await _dio.put<dynamic>(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = response.data;
-        
-        // 处理响应数据是Map类型的情况
-        if (responseData is Map) {
-          // 检查业务状态码
-          final code = responseData['code'];
-          if (code != null && code != 200 && code != 0) {
-            // 业务逻辑错误
-            return ApiResponse<T>(
-              success: false,
-              code: code,
-              message: responseData['msg'] ?? responseData['message'] ?? '未知错误',
-            );
-          }
-          
-          // 业务逻辑成功
-          if (fromJson != null && responseData['data'] != null) {
-            return ApiResponse<T>(
-              success: true,
-              code: code ?? 200,
-              message: responseData['msg'] ?? responseData['message'] ?? 'Success',
-              data: fromJson(responseData['data']),
-            );
-          }
-          
-          // 没有data字段或不需要解析
-          return ApiResponse<T>(
-            success: true,
-            code: code ?? 200,
-            message: responseData['msg'] ?? responseData['message'] ?? 'Success',
-            data: null,
-          );
-        }
-        
-        // 直接返回非Map类型的数据
-        if (fromJson != null && responseData != null) {
-          return ApiResponse<T>(
-            success: true,
-            message: 'Success',
-            data: fromJson(responseData),
-          );
-        }
-        
-        return ApiResponse<T>(
-          success: true,
-          message: 'Success',
-          data: responseData as T,
-        );
-      } else {
-        return ApiResponse<T>(
-          success: false,
-          code: response.statusCode ?? 500,
-          message: 'Request failed with status: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      // 打印错误信息
-      print('┌───────────────────────────────────────────');
-      print('│ 错误类型: ${e is DioException ? e.type : e.runtimeType}');
-      print('│ 错误信息: ${e is DioException ? e.message : e}');
-      print('└───────────────────────────────────────────');
-      
-      return ApiResponse<T>(
-        success: false,
-        code: e is DioException ? e.response?.statusCode ?? 500 : 500,
-        message: e is DioException ? e.message ?? 'Unknown error' : e.toString(),
-      );
-    }
-  }
-
-  // DELETE请求
-  Future<ApiResponse<T>> delete<T>(
-    String path, {
-    dynamic data,
-    Map<String, dynamic>? queryParameters,
-    T Function(dynamic)? fromJson,
-  }) async {
-    try {
-      // 打印请求信息
-      print('┌───────────────────────────────────────────');
-      print('│ 请求方法: DELETE');
-      print('│ 请求地址: $_baseUrl$path');
-      print('│ 请求参数: $queryParameters');
-      print('│ 请求体: $data');
-      print('└───────────────────────────────────────────');
-      
-      final response = await _dio.delete<dynamic>(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = response.data;
-        
-        // 处理响应数据是Map类型的情况
-        if (responseData is Map) {
-          // 检查业务状态码
-          final code = responseData['code'];
-          if (code != null && code != 200 && code != 0) {
-            // 业务逻辑错误
-            return ApiResponse<T>(
-              success: false,
-              code: code,
-              message: responseData['msg'] ?? responseData['message'] ?? '未知错误',
-            );
-          }
-          
-          // 业务逻辑成功
-          if (fromJson != null && responseData['data'] != null) {
-            return ApiResponse<T>(
-              success: true,
-              code: code ?? 200,
-              message: responseData['msg'] ?? responseData['message'] ?? 'Success',
-              data: fromJson(responseData['data']),
-            );
-          }
-          
-          // 没有data字段或不需要解析
-          return ApiResponse<T>(
-            success: true,
-            code: code ?? 200,
-            message: responseData['msg'] ?? responseData['message'] ?? 'Success',
-            data: null,
-          );
-        }
-        
-        // 直接返回非Map类型的数据
-        if (fromJson != null && responseData != null) {
-          return ApiResponse<T>(
-            success: true,
-            message: 'Success',
-            data: fromJson(responseData),
-          );
-        }
-        
-        return ApiResponse<T>(
-          success: true,
-          message: 'Success',
-          data: responseData as T,
-        );
-      } else {
-        return ApiResponse<T>(
-          success: false,
-          code: response.statusCode ?? 500,
-          message: 'Request failed with status: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      // 打印错误信息
-      print('┌───────────────────────────────────────────');
-      print('│ 错误类型: ${e is DioException ? e.type : e.runtimeType}');
-      print('│ 错误信息: ${e is DioException ? e.message : e}');
-      print('└───────────────────────────────────────────');
-      
-      return ApiResponse<T>(
-        success: false,
-        code: e is DioException ? e.response?.statusCode ?? 500 : 500,
-        message: e is DioException ? e.message ?? 'Unknown error' : e.toString(),
-      );
+  
+  // 获取dio实例，用于测试或特殊处理
+  Dio get dio => _dio;
+  
+  // 手动添加授权头，确保每个请求都有
+  void addAuthorizationHeader() async {
+    final token = await TokenManager.getToken();
+    if (token != null && token.isNotEmpty) {
+      _dio.options.headers['Authorization'] = 'Bearer $token';
     }
   }
 } 

@@ -1,6 +1,8 @@
+import 'package:ai_bot/http/services/agent_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../../../pages/device/bot_connect_page.dart';
+import '../../../http/models/agent_model.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -10,25 +12,79 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  // 用户名称
-  final String _userName = '饺子';
+  // 用户服务
+  final AgentService _agentService = AgentService();
+
+  // 智能体列表
+  List<AgentModel> _agentList = [];
+
+  // 当前选中的智能体
+  AgentModel? _selectedAgent;
+
+  // 是否正在加载
+  bool _isLoading = true;
+
   // 是否有机器人
   final bool _hasRobots = false;
+
   // 输入控制器
   final TextEditingController _familyNameController = TextEditingController();
-  
+
+  @override
+  void initState() {
+    super.initState();
+    _agentService.init();
+    // 加载智能体列表
+    _loadAgentList();
+  }
+
+  // 加载智能体列表
+  Future<void> _loadAgentList() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _agentService.getAgentList();
+
+      if (response.success &&
+          response.data != null &&
+          response.data!.isNotEmpty) {
+        setState(() {
+          _agentList = response.data!;
+          // 默认选择第一个智能体
+          _selectedAgent = _agentList.first;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载智能体列表失败: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 更新选中的智能体
+  void _updateSelectedAgent(AgentModel agent) {
+    setState(() {
+      _selectedAgent = agent;
+    });
+    // 这里可以添加保存用户选择的逻辑，暂时用内存保存
+  }
+
   @override
   void dispose() {
     _familyNameController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // 获取屏幕高度
     final screenHeight = MediaQuery.of(context).size.height;
     final gradientHeight = screenHeight / 3; // 渐变高度为屏幕的1/3
-    
+
     return Scaffold(
       backgroundColor: Colors.transparent, // 设置为透明，以便显示渐变背景
       body: Stack(
@@ -63,12 +119,14 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 // 顶部标题栏
                 _buildAppBar(),
-                
+
                 // 主内容区域
                 Expanded(
-                  child: _hasRobots 
-                    ? _buildRobotList()
-                    : _buildEmptyState(),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _hasRobots
+                          ? _buildRobotList()
+                          : _buildEmptyState(),
                 ),
               ],
             ),
@@ -77,7 +135,7 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
-  
+
   // 构建顶部标题栏
   Widget _buildAppBar() {
     return Container(
@@ -91,24 +149,47 @@ class _HomeTabState extends State<HomeTab> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 左侧标题
-          Row(
-            children: [
-              Text(
-                '$_userName的家庭',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+          // 左侧标题 - 添加下拉菜单
+          PopupMenuButton<AgentModel>(
+            offset: const Offset(0, 40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            enabled: _agentList.isNotEmpty,
+            onSelected: _updateSelectedAgent,
+            itemBuilder: (context) {
+              return _agentList.map((agent) {
+                return PopupMenuItem<AgentModel>(
+                  value: agent,
+                  child: Text(
+                    agent.agentName,
+                    style: TextStyle(
+                      fontWeight: _selectedAgent?.id == agent.id
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                );
+              }).toList();
+            },
+            child: Row(
+              children: [
+                Text(
+                  _isLoading ? '加载中...' : _selectedAgent?.agentName ?? '暂无智能体',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.keyboard_arrow_down,
-                size: 20,
-              ),
-            ],
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 20,
+                ),
+              ],
+            ),
           ),
-          
+
           // 右侧添加按钮
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
@@ -121,12 +202,12 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
-  
+
   // 显示新建家庭/班级对话框
   void _showCreateFamilyDialog() {
     // 重置输入控制器
     _familyNameController.clear();
-    
+
     showDialog(
       context: context,
       barrierDismissible: false, // 点击外部不关闭
@@ -154,7 +235,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // 输入框
                 TextField(
                   controller: _familyNameController,
@@ -174,7 +255,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // 按钮区
                 Row(
                   children: [
@@ -200,7 +281,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // 确认按钮
                     Expanded(
                       child: ElevatedButton(
@@ -236,7 +317,7 @@ class _HomeTabState extends State<HomeTab> {
       },
     );
   }
-  
+
   // 构建空状态
   Widget _buildEmptyState() {
     return Center(
@@ -257,20 +338,20 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // 文字提示
           const Text(
             '暂无机器人',
             style: TextStyle(
               fontSize: 16,
-              color:const Color(0xFF333333),
+              color: const Color(0xFF333333),
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // 添加按钮
           SizedBox(
             width: 200,
@@ -279,7 +360,8 @@ class _HomeTabState extends State<HomeTab> {
               onPressed: () {
                 // 导航到机器人连接页面
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const BotConnectPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const BotConnectPage()),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -303,7 +385,7 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
-  
+
   // 构建机器人列表
   Widget _buildRobotList() {
     // TODO: 实现机器人列表
@@ -341,11 +423,11 @@ class DashedBorderPainter extends CustomPainter {
       ));
 
     final Path dashPath = Path();
-    
+
     // 计算周长
     final double perimeter = 2 * (size.width + size.height);
     final double dashCount = perimeter / (dashWidth + dashSpace);
-    
+
     // 绘制虚线
     for (int i = 0; i < dashCount.floor(); i++) {
       final double start = i * (dashWidth + dashSpace);
@@ -355,7 +437,7 @@ class DashedBorderPainter extends CustomPainter {
         Offset.zero,
       );
     }
-    
+
     canvas.drawPath(dashPath, paint);
   }
 
@@ -384,4 +466,4 @@ class DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-} 
+}
