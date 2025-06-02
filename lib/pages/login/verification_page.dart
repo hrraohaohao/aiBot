@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'login_controller.dart';
 import '../../http/services/user_service.dart';
@@ -28,6 +29,7 @@ class _VerificationPageState extends State<VerificationPage> {
   
   final LoginController _controller = LoginController();
   final UserService _userService = UserService();
+  final FocusNode _containerFocusNode = FocusNode();
   
   bool _isLoading = false;
   int _countdown = 60;
@@ -40,22 +42,25 @@ class _VerificationPageState extends State<VerificationPage> {
     super.initState();
     _startCountdown();
     
-    // 监听焦点变化，自动跳转到下一个输入框
-    for (int i = 0; i < 5; i++) {
-      _controllers[i].addListener(() {
-        if (_controllers[i].text.isNotEmpty) {
+    // 为每个输入框配置控制器监听
+    for (int i = 0; i < 6; i++) {
+      final controller = _controllers[i];
+      controller.addListener(() {
+        // 监听文本变化
+        final text = controller.text;
+        
+        // 如果输入了内容，自动跳到下一个框
+        if (text.isNotEmpty && text.length == 1 && i < 5) {
           _focusNodes[i + 1].requestFocus();
+        }
+        
+        // 检查是否所有格子都填满了
+        if (_isCodeComplete && controller == _controllers.last) {
+          _handleVerification();
         }
       });
     }
-    
-    // 监听最后一个输入框，当输入完成后自动验证
-    _controllers.last.addListener(() {
-      if (_controllers.last.text.isNotEmpty && _isCodeComplete) {
-        _handleVerification();
-      }
-    });
-    
+
     // 自动聚焦第一个输入框
     Future.delayed(const Duration(milliseconds: 100), () {
       _focusNodes[0].requestFocus();
@@ -71,6 +76,7 @@ class _VerificationPageState extends State<VerificationPage> {
     for (var node in _focusNodes) {
       node.dispose();
     }
+    _containerFocusNode.dispose();
     super.dispose();
   }
   
@@ -215,6 +221,77 @@ class _VerificationPageState extends State<VerificationPage> {
     }
   }
 
+  // 验证码输入框UI部分
+  Widget _buildVerificationInputs() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: RawKeyboardListener(
+        focusNode: _containerFocusNode,
+        onKey: (RawKeyEvent event) {
+          // 检测到删除键
+          if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+            // 找到当前焦点所在的输入框
+            for (int i = 0; i < 6; i++) {
+              if (_focusNodes[i].hasFocus) {
+                // 如果当前输入框为空且不是第一个，则跳转到前一个输入框
+                if (_controllers[i].text.isEmpty && i > 0) {
+                  _focusNodes[i - 1].requestFocus();
+                  _controllers[i - 1].text = '';
+                  break;
+                }
+              }
+            }
+          }
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            6,
+            (index) => SizedBox(
+              width: 46,
+              height: 60,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _controllers[index],
+                  focusNode: _focusNodes[index],
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  maxLength: 1,
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    border: InputBorder.none,
+                  ),
+                  onChanged: (value) {
+                    // 如果清空了输入框，且不是第一个输入框，则返回上一个
+                    if (value.isEmpty && index > 0) {
+                      _focusNodes[index - 1].requestFocus();
+                    }
+                  },
+                  // 限制只能输入数字
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -304,50 +381,7 @@ class _VerificationPageState extends State<VerificationPage> {
                         const SizedBox(height: 50),
                         
                         // 验证码输入框
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(
-                              6,
-                              (index) => SizedBox(
-                                width: 46,
-                                height: 60,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.05),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextField(
-                                    controller: _controllers[index],
-                                    focusNode: _focusNodes[index],
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                                    maxLength: 1,
-                                    decoration: const InputDecoration(
-                                      counterText: '',
-                                      border: InputBorder.none,
-                                    ),
-                                    onChanged: (value) {
-                                      // 自动跳转到上一个输入框
-                                      if (value.isEmpty && index > 0) {
-                                        _focusNodes[index - 1].requestFocus();
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        _buildVerificationInputs(),
                       ],
                     ),
                   ),

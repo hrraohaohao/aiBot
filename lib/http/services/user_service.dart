@@ -32,14 +32,12 @@ class UserService extends ApiService {
   Future<ApiResponse<String>> userRegister({
     required String username,
     required String password,
-    required String captcha,
-    required String captchaId,
+    required String mobileCaptcha,
   }) async {
     final Map<String, dynamic> data = {
-      'username': username,
+      'username': '+86$username',
       'password': password,
-      'captcha': captcha,
-      'captchaId': captchaId,
+      'mobileCaptcha': mobileCaptcha,
     };
     final response = await post<String>(
       _userRegister,
@@ -54,7 +52,7 @@ class UserService extends ApiService {
     required String password,
   }) async {
     final Map<String, dynamic> data = {
-      'username': username,
+      'username': '+86$username',
       'password': password,
     };
     final response = await post<LoginResponse>(
@@ -76,7 +74,7 @@ class UserService extends ApiService {
     required String phone,
   }) async {
     final Map<String, dynamic> data = {
-      'phone': phone,
+      'phone': '+86$phone',
     };
     final response = await post<String>(
       _smsVerification,

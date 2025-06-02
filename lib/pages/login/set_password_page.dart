@@ -5,9 +5,9 @@ import '../../http/services/user_service.dart';
 class SetPasswordPage extends StatefulWidget {
   final String phoneNumber;
   final String verificationCode;
-  
+
   const SetPasswordPage({
-    super.key, 
+    super.key,
     required this.phoneNumber,
     required this.verificationCode,
   });
@@ -21,23 +21,24 @@ const Color kPrimaryColor = Color(0xFF3C8BFF);
 
 class _SetPasswordPageState extends State<SetPasswordPage> {
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final LoginController _controller = LoginController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   String? _passwordError;
   String? _confirmPasswordError;
   bool _isInputValid = false;
-  
+
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_validateInput);
     _confirmPasswordController.addListener(_validateInput);
   }
-  
+
   @override
   void dispose() {
     _passwordController.removeListener(_validateInput);
@@ -46,68 +47,68 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-  
+
   // 检查输入是否有效
   void _validateInput() {
     final password = _passwordController.text;
     final isValid = password.isNotEmpty;
-    
+
     if (isValid != _isInputValid) {
       setState(() {
         _isInputValid = isValid;
       });
     }
   }
-  
+
   // 验证密码
   bool _validatePassword() {
     final password = _passwordController.text;
-    
+
     if (password.isEmpty) {
       setState(() {
         _passwordError = '请输入密码';
       });
       return false;
     }
-    
+
     if (password.length < 6 || password.length > 16) {
       setState(() {
         _passwordError = '密码长度应为6-16位';
       });
       return false;
     }
-    
+
     setState(() {
       _passwordError = null;
     });
     return true;
   }
-  
+
   // 验证确认密码
   bool _validateConfirmPassword() {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
-    
+
     if (confirmPassword.isEmpty) {
       setState(() {
         _confirmPasswordError = '请再次输入密码';
       });
       return false;
     }
-    
+
     if (password != confirmPassword) {
       setState(() {
         _confirmPasswordError = '两次输入的密码不一致';
       });
       return false;
     }
-    
+
     setState(() {
       _confirmPasswordError = null;
     });
     return true;
   }
-  
+
   // 完成注册
   Future<void> _handleRegister() async {
     // 清除错误信息
@@ -115,39 +116,37 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       _passwordError = null;
       _confirmPasswordError = null;
     });
-    
+
     // 验证密码
     final isPasswordValid = _validatePassword();
-    final isConfirmPasswordValid = _validateConfirmPassword();
-    
-    if (!isPasswordValid || !isConfirmPasswordValid) {
+
+    if (!isPasswordValid) {
       return;
     }
-    
+
     // 显示加载中
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       // 调用实际的注册接口
       final userService = UserService();
-      await userService.init(); // 确保服务已初始化
-      
+      await userService.init();
+
       final response = await userService.userRegister(
         username: widget.phoneNumber,
         password: _passwordController.text,
-        captcha: widget.verificationCode, // 使用从验证码页面传来的验证码
-        captchaId: widget.phoneNumber, // 使用手机号作为captchaId
+        mobileCaptcha: widget.verificationCode,
       );
-      
+
       if (mounted) {
         if (response.success) {
           // 注册成功，返回登录页并显示提示
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('注册成功，请登录')),
           );
-          
+
           // 返回到登录页面（清除导航栈）
           Navigator.of(context).popUntil((route) => route.isFirst);
         } else {
@@ -250,9 +249,9 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                             ],
                           ),
                         ),
-                        
+
                         const SizedBox(height: 50),
-                        
+
                         // 密码输入框
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 40),
@@ -272,7 +271,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                                     });
                                   },
                                   child: Image.asset(
-                                    _obscurePassword 
+                                    _obscurePassword
                                         ? 'assets/images/icon_password_hide.png'
                                         : 'assets/images/icon_password_show.png',
                                     width: 26,
@@ -287,7 +286,8 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                                   decoration: const InputDecoration(
                                     hintText: '6-16位字母/数字/符号密码',
                                     hintStyle: TextStyle(color: Colors.grey),
-                                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                                    contentPadding:
+                                        EdgeInsets.symmetric(vertical: 15),
                                     border: InputBorder.none,
                                   ),
                                   onChanged: (_) {
@@ -303,7 +303,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                             ],
                           ),
                         ),
-                        
+
                         // 密码错误提示
                         if (_passwordError != null)
                           Padding(
@@ -320,17 +320,20 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     ),
                   ),
                 ),
-                
+
                 // 底部区域 - 包含按钮
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // 完成注册按钮
                     Container(
-                      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 88),
+                      margin: const EdgeInsets.only(
+                          left: 40, right: 40, bottom: 88),
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _isInputValid ? (_isLoading ? null : _handleRegister) : null,
+                        onPressed: _isInputValid
+                            ? (_isLoading ? null : _handleRegister)
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryColor,
                           foregroundColor: Colors.white,
@@ -338,10 +341,11 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                             borderRadius: BorderRadius.circular(26),
                           ),
                           elevation: 0,
-                          disabledBackgroundColor: kPrimaryColor.withOpacity(0.5),
+                          disabledBackgroundColor:
+                              kPrimaryColor.withOpacity(0.5),
                           disabledForegroundColor: Colors.white,
                         ),
-                        child: _isLoading 
+                        child: _isLoading
                             ? const SizedBox(
                                 width: 24,
                                 height: 24,
@@ -365,4 +369,4 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       ),
     );
   }
-} 
+}
