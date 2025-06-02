@@ -4,6 +4,21 @@ import 'dart:ui';
 import '../../../pages/device/bot_connect_page.dart';
 import '../../../http/models/agent_model.dart';
 
+// 菜单项类型枚举
+enum MenuItemType {
+  agent,
+  manage,
+}
+
+// 菜单项包装类
+class MenuItem {
+  final MenuItemType type;
+  final AgentModel? agent;
+  
+  MenuItem.agent(this.agent) : type = MenuItemType.agent;
+  MenuItem.manage() : agent = null, type = MenuItemType.manage;
+}
+
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -194,27 +209,68 @@ class _HomeTabState extends State<HomeTab> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // 左侧标题 - 添加下拉菜单
-          PopupMenuButton<AgentModel>(
+          PopupMenuButton<MenuItem>(
             offset: const Offset(0, 40),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             enabled: _agentList.isNotEmpty,
-            onSelected: _updateSelectedAgent,
+            onSelected: (MenuItem item) {
+              if (item.type == MenuItemType.agent && item.agent != null) {
+                _updateSelectedAgent(item.agent!);
+              } else if (item.type == MenuItemType.manage) {
+                _navigateToAgentManagement();
+              }
+            },
             itemBuilder: (context) {
-              return _agentList.map((agent) {
-                return PopupMenuItem<AgentModel>(
-                  value: agent,
-                  child: Text(
-                    agent.agentName,
-                    style: TextStyle(
-                      fontWeight: _selectedAgent?.id == agent.id
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
+              // 创建智能体列表选项
+              List<PopupMenuItem<MenuItem>> items = _agentList.map((agent) {
+                return PopupMenuItem<MenuItem>(
+                  value: MenuItem.agent(agent),
+                  child: Row(
+                    children: [
+                      // 智能体图标
+                      Image.asset(
+                        'assets/images/icon_home.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      // 智能体名称
+                      Text(
+                        agent.agentName,
+                        style: TextStyle(
+                          fontWeight: _selectedAgent?.id == agent.id
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }).toList();
+              
+              // 添加"智能体管理"选项
+              if (_agentList.isNotEmpty) {
+                items.add(
+                  PopupMenuItem<MenuItem>(
+                    value: MenuItem.manage(),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          'assets/images/icon_bot_set.png',
+                          width: 20,
+                          height: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('智能体管理'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              return items;
             },
             child: Row(
               children: [
@@ -238,7 +294,7 @@ class _HomeTabState extends State<HomeTab> {
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
-              // 显示新建家庭/班级对话框
+              // 显示新建智能体对话框
               _showCreateFamilyDialog();
             },
           ),
@@ -458,6 +514,13 @@ class _HomeTabState extends State<HomeTab> {
     // TODO: 实现机器人列表
     return const Center(
       child: Text('机器人列表待实现'),
+    );
+  }
+
+  void _navigateToAgentManagement() {
+    // 跳转到智能体管理页面的逻辑
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('跳转到智能体管理页面')),
     );
   }
 }
