@@ -2,9 +2,21 @@ import 'package:ai_bot/routes/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'utils/token_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
+  // 确保Flutter绑定初始化
   WidgetsFlutterBinding.ensureInitialized();
+  
+  debugPrint('应用启动: main() 被调用');
+
+  // 预初始化SharedPreferences，避免后续通道错误
+  try {
+    await SharedPreferences.getInstance();
+    debugPrint('SharedPreferences初始化成功');
+  } catch (e) {
+    debugPrint('SharedPreferences初始化失败: $e');
+  }
 
   // 设置状态栏透明
   SystemChrome.setSystemUIOverlayStyle(
@@ -14,6 +26,9 @@ void main() {
     ),
   );
 
+  // 初始化TokenManager
+  await TokenManager.init();
+
   runApp(const MyApp());
 }
 
@@ -22,6 +37,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('MyApp.build() 被调用');
     return MaterialApp(
       title: '小Xin机器人',
       theme: ThemeData(
@@ -62,21 +78,33 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('SplashScreen.initState() 被调用');
     _checkLoginStatus();
   }
 
   // 检查登录状态，决定跳转页面
   Future<void> _checkLoginStatus() async {
-    // 检查是否已登录
-    final isLoggedIn = await TokenManager.isTokenValid();
-    debugPrint('isLoggedIn $isLoggedIn');
-    if (mounted) {
-      // 根据登录状态跳转
-      if (isLoggedIn) {
-        debugPrint('登录信息有效，跳转到首页');
-        Navigator.of(context).pushReplacementNamed('/main');
+    debugPrint('开始检查登录状态...');
+    try {
+      // 检查是否已登录
+      final isLoggedIn = await TokenManager.isTokenValid();
+      debugPrint('isLoggedIn $isLoggedIn');
+      if (mounted) {
+        // 根据登录状态跳转
+        if (isLoggedIn) {
+          debugPrint('登录信息有效，跳转到首页');
+          Navigator.of(context).pushReplacementNamed('/main');
+        } else {
+          debugPrint('登录信息无效，跳转到登录页');
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
       } else {
-        debugPrint('登录信息无效，跳转到登录页');
+        debugPrint('Widget已不再挂载，取消导航');
+      }
+    } catch (e) {
+      debugPrint('检查登录状态出错: $e');
+      if (mounted) {
+        // 出错时默认跳转到登录页
         Navigator.of(context).pushReplacementNamed('/login');
       }
     }
@@ -84,6 +112,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('SplashScreen.build() 被调用');
     return const Scaffold(
       body: Center(
         child: Column(
