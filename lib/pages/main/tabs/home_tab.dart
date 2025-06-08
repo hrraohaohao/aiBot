@@ -1,8 +1,10 @@
 import 'package:ai_bot/http/services/agent_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:math'; // 添加Random用于模拟状态
 import '../../../pages/device/bot_connect_page.dart';
 import '../../../http/models/agent_model.dart';
+import '../../../http/models/device_model.dart';
 import '../../../pages/agent/aibot_setting_page.dart';
 
 // 菜单项类型枚举
@@ -18,6 +20,43 @@ class MenuItem {
   
   MenuItem.agent(this.agent) : type = MenuItemType.agent;
   MenuItem.manage() : agent = null, type = MenuItemType.manage;
+}
+
+// 设备状态枚举
+enum DeviceStatus {
+  online,    // 在线
+  offline,   // 离线
+  charging,  // 充电中
+  noNetwork, // 无网络连接
+}
+
+// 设备状态扩展
+extension DeviceStatusExtension on DeviceStatus {
+  String get text {
+    switch (this) {
+      case DeviceStatus.online:
+        return '在线';
+      case DeviceStatus.offline:
+        return '离线';
+      case DeviceStatus.charging:
+        return '充电中';
+      case DeviceStatus.noNetwork:
+        return '无网络连接';
+    }
+  }
+  
+  Color get color {
+    switch (this) {
+      case DeviceStatus.online:
+        return Colors.green;
+      case DeviceStatus.offline:
+        return Colors.grey;
+      case DeviceStatus.charging:
+        return Colors.orange;
+      case DeviceStatus.noNetwork:
+        return Colors.blue;
+    }
+  }
 }
 
 class HomeTab extends StatefulWidget {
@@ -42,6 +81,9 @@ class _HomeTabState extends State<HomeTab> {
 
   // 是否有机器人
   final bool _hasRobots = false;
+  
+  // 绑定的机器人列表
+  List<DeviceModel> _bindBotList = [];
 
   // 输入控制器
   final TextEditingController _familyNameController = TextEditingController();
@@ -71,6 +113,11 @@ class _HomeTabState extends State<HomeTab> {
           // 默认选择第一个智能体
           _selectedAgent = _agentList.first;
         });
+        
+        // 加载第一个智能体的绑定机器人列表
+        if (_selectedAgent != null) {
+          await _loadBindBotList(_selectedAgent!.id);
+        }
       }
     } catch (e) {
       debugPrint('加载智能体列表失败: $e');
@@ -86,7 +133,41 @@ class _HomeTabState extends State<HomeTab> {
     setState(() {
       _selectedAgent = agent;
     });
-    // 这里可以添加保存用户选择的逻辑，暂时用内存保存
+    // 获取与该智能体绑定的机器人列表
+    _loadBindBotList(agent.id);
+  }
+
+  // 加载绑定的机器人列表
+  Future<void> _loadBindBotList(String agentId) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _agentService.getBindBotList(agentId: agentId);
+
+      if (response.success && response.data != null && response.data!.isNotEmpty) {
+        setState(() {
+          _bindBotList = response.data!;
+        });
+      } else {
+        // 没有数据时显示空列表
+        setState(() {
+          _bindBotList = [];
+        });
+      }
+    } catch (e) {
+      debugPrint('加载绑定机器人列表失败: $e');
+      
+      // 发生异常时显示空列表
+      setState(() {
+        _bindBotList = [];
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   // 创建智能体并刷新列表
@@ -184,7 +265,7 @@ class _HomeTabState extends State<HomeTab> {
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : _hasRobots
+                      : _bindBotList.isNotEmpty
                           ? _buildRobotList()
                           : _buildEmptyState(),
                 ),
@@ -510,11 +591,126 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  // 获取随机设备状态（仅用于模拟）
+  DeviceStatus _getDeviceStatus(int index) {
+    // 使用固定的状态来对应图片中的四种状态
+    switch (index % 4) {
+      case 0:
+        return DeviceStatus.charging;
+      case 1:
+        return DeviceStatus.offline;
+      case 2:
+        return DeviceStatus.online;
+      case 3:
+        return DeviceStatus.noNetwork;
+      default:
+        return DeviceStatus.offline;
+    }
+  }
+
   // 构建机器人列表
   Widget _buildRobotList() {
-    // TODO: 实现机器人列表
-    return const Center(
-      child: Text('机器人列表待实现'),
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, // 每行两个
+        childAspectRatio: 1.0, // 宽高比
+        crossAxisSpacing: 16, // 水平间距
+        mainAxisSpacing: 16, // 垂直间距
+      ),
+      itemCount: _bindBotList.length,
+      itemBuilder: (context, index) {
+        final bot = _bindBotList[index];
+        final status = _getDeviceStatus(index);
+        
+        return GestureDetector(
+          onTap: () {
+            // TODO: 实现设备详情页面跳转
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('查看设备: ${bot.alias}')),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 设备名称和状态
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bot.alias.isNotEmpty ? bot.alias : '未命名设备',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        status.text,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: status.color,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // 机器人图片（不再居中，而是靠右）
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Image.asset(
+                        'assets/images/icon_bot_online.png',
+                        width: 75,
+                        height: 58,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // 如果是在线状态，显示提醒消息
+                if (status == DeviceStatus.online)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEEDED),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Text(
+                        '2条新的警告',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFF25B5B),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
