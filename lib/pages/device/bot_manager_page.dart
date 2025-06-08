@@ -424,54 +424,65 @@ class _BotManagerPageState extends State<BotManagerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return WillPopScope(
+      // 拦截返回事件，设置结果为true表示数据已更新
+      onWillPop: () async {
+        // 返回true表示数据已更改，需要刷新
+        Navigator.of(context).pop(true);
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          widget.agentName,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+            onPressed: () {
+              // 返回并传递结果，true表示数据已更新，需要刷新
+              Navigator.of(context).pop(true);
+            },
           ),
-        ),
-        actions: [
-          // 管理按钮
-          TextButton(
-            onPressed: _toggleManageMode,
-            child: Text(
-              _isManageMode ? '完成' : '管理',
-              style: const TextStyle(
-                color: Color(0xFF3C8BFF),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+          title: Text(
+            widget.agentName,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 设备列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _deviceList.isEmpty
-                    ? _buildEmptyState()
-                    : _buildDeviceList(),
-          ),
-          
-          // 底部按钮区域
-          if (!_isLoading && _deviceList.isNotEmpty)
-            _buildBottomActions(),
-        ],
+          actions: [
+            // 管理按钮
+            TextButton(
+              onPressed: _toggleManageMode,
+              child: Text(
+                _isManageMode ? '完成' : '管理',
+                style: const TextStyle(
+                  color: Color(0xFF3C8BFF),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // 设备列表
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _deviceList.isEmpty
+                      ? _buildEmptyState()
+                      : _buildDeviceList(),
+            ),
+            
+            // 底部按钮区域
+            if (!_isLoading && _deviceList.isNotEmpty)
+              _buildBottomActions(),
+          ],
+        ),
       ),
     );
   }

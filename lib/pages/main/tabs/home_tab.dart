@@ -573,7 +573,12 @@ class _HomeTabState extends State<HomeTab> {
                         agentName: _selectedAgent!.agentName,
                       ),
                     ),
-                  );
+                  ).then((result) {
+                    // 如果返回结果为true，表示数据已更改，需要刷新
+                    if (result == true && _selectedAgent != null) {
+                      _loadBindBotList(_selectedAgent!.id);
+                    }
+                  });
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('请先选择或创建一个智能体')),
@@ -645,9 +650,9 @@ class _HomeTabState extends State<HomeTab> {
                     agentName: _selectedAgent!.agentName,
                   ),
                 ),
-              ).then((_) {
-                // 返回时刷新设备列表
-                if (_selectedAgent != null) {
+              ).then((result) {
+                // 如果返回结果为true，表示数据已更改，需要刷新
+                if (result == true && _selectedAgent != null) {
                   _loadBindBotList(_selectedAgent!.id);
                 }
               });
@@ -731,8 +736,13 @@ class _HomeTabState extends State<HomeTab> {
   void _navigateToAgentManagement() {
     // 跳转到智能体管理页面
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const AgentManagerPage()),
-    );
+      MaterialPageRoute(
+        builder: (context) => const AgentManagerPage(),
+      ),
+    ).then((_) {
+      // 从智能体管理页面返回时刷新数据
+      _loadAgentList();
+    });
   }
 }
 

@@ -10,7 +10,7 @@ class AgentManagerPage extends StatefulWidget {
   State<AgentManagerPage> createState() => _AgentManagerPageState();
 }
 
-class _AgentManagerPageState extends State<AgentManagerPage> {
+class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBindingObserver {
   // 智能体服务
   final AgentService _agentService = AgentService();
   
@@ -20,12 +20,48 @@ class _AgentManagerPageState extends State<AgentManagerPage> {
   // 是否正在加载
   bool _isLoading = true;
   
+  // 输入控制器
+  final TextEditingController _agentNameController = TextEditingController();
+  
+  // 焦点节点，用于检测页面获取焦点事件
+  final FocusNode _pageFocusNode = FocusNode();
+  
   @override
   void initState() {
     super.initState();
     _agentService.init();
+    
+    // 注册应用生命周期观察者
+    WidgetsBinding.instance.addObserver(this);
+    
+    // 监听焦点变化
+    _pageFocusNode.addListener(_onFocusChange);
+    
     // 加载智能体列表
     _loadAgentList();
+  }
+  
+  // 焦点变化监听
+  void _onFocusChange() {
+    if (_pageFocusNode.hasFocus) {
+      // 页面获得焦点时刷新数据
+      _loadAgentList();
+    }
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 路由依赖变化时（如返回到此页面）刷新数据
+    _loadAgentList();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 应用从后台恢复到前台时刷新数据
+      _loadAgentList();
+    }
   }
   
   // 加载智能体列表
@@ -60,48 +96,238 @@ class _AgentManagerPageState extends State<AgentManagerPage> {
   
   // 创建新智能体
   void _createNewAgent() {
-    // 跳转到智能体设置页面
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const AiBotSettingPage()),
-    ).then((_) {
-      // 返回时刷新列表
-      _loadAgentList();
+    // 显示新建智能体对话框
+    _showCreateAgentDialog();
+  }
+  
+  // 创建智能体并刷新列表
+  Future<void> _createAgent(String agentName) async {
+    setState(() {
+      _isLoading = true;
     });
+    
+    try {
+      // 调用创建智能体接口
+      final response = await _agentService.agent(agentName: agentName);
+      
+      if (response.success) {
+        // 创建成功，显示提示
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('智能体创建成功')),
+          );
+        }
+        
+        // 刷新智能体列表
+        await _loadAgentList();
+      } else {
+        // 创建失败，显示错误信息
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('创建失败: ${response.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      // 发生异常
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建失败: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _showCreateAgentDialog() {
+    _agentNameController.clear();
+    bool isCreating = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // 点击外部不关闭
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.0),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 标题
+                    const Center(
+                      child: Text(
+                        '添加智能体',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 输入框
+                    TextField(
+                      controller: _agentNameController,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        hintText: '请输入智能体名称',
+                        hintStyle: TextStyle(color: Colors.grey.shade500),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 按钮区
+                    Row(
+                      children: [
+                        // 取消按钮
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isCreating 
+                                ? null 
+                                : () {
+                                    Navigator.of(context).pop();
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF5F5F5),
+                              foregroundColor: Colors.black87,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              '取消',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // 确认按钮
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isCreating 
+                                ? null 
+                                : () async {
+                                    final agentName = _agentNameController.text.trim();
+                                    if (agentName.isNotEmpty) {
+                                      // 设置加载状态
+                                      setState(() {
+                                        isCreating = true;
+                                      });
+                                      
+                                      // 关闭对话框
+                                      Navigator.of(context).pop();
+                                      
+                                      // 创建智能体
+                                      await _createAgent(agentName);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3C8BFF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: isCreating
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    '确认',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+  
+  @override
+  void dispose() {
+    // 释放资源
+    _agentNameController.dispose();
+    _pageFocusNode.removeListener(_onFocusChange);
+    _pageFocusNode.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
   
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return Focus(
+      focusNode: _pageFocusNode,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          '智能体管理',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ),
-        actions: [
-          // 添加按钮
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
-            onPressed: _createNewAgent,
+          title: const Text(
+            '智能体管理',
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ],
+          actions: [
+            // 添加按钮
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
+              onPressed: _createNewAgent,
+            ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _agentList.isEmpty
+                ? _buildEmptyState()
+                : _buildAgentList(),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _agentList.isEmpty
-              ? _buildEmptyState()
-              : _buildAgentList(),
     );
   }
   
@@ -186,10 +412,15 @@ class _AgentManagerPageState extends State<AgentManagerPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // TODO: 实现智能体详情页面跳转
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('查看智能体: ${agent.agentName}')),
-            );
+            // 跳转到智能体详情页面，并在返回时刷新数据
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const AiBotSettingPage(),
+              ),
+            ).then((_) {
+              // 从详情页面返回时刷新数据
+              _loadAgentList();
+            });
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
