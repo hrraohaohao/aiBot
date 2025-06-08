@@ -6,6 +6,7 @@ import '../../../http/models/agent_model.dart';
 import '../../../http/models/device_model.dart';
 import '../../../pages/agent/aibot_setting_page.dart';
 import '../../../pages/device/bot_manager_page.dart';
+import '../../agent/agent_manager_page.dart';
 
 // 菜单项类型枚举
 enum MenuItemType {
@@ -730,7 +731,7 @@ class _HomeTabState extends State<HomeTab> {
   void _navigateToAgentManagement() {
     // 跳转到智能体管理页面
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const AiBotSettingPage()),
+      MaterialPageRoute(builder: (context) => const AgentManagerPage()),
     );
   }
 }
