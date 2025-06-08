@@ -1,6 +1,6 @@
 class DeviceModel {
   final String id;
-  final int userId;
+  final String userId;
   final String macAddress;
   final String lastConnectedAt;
   final int autoUpdate;
@@ -9,9 +9,9 @@ class DeviceModel {
   final String agentId;
   final String appVersion;
   final int sort;
-  final int updater;
+  final dynamic updater;
   final String updateDate;
-  final int creator;
+  final String creator;
   final String createDate;
 
   DeviceModel({
@@ -33,20 +33,20 @@ class DeviceModel {
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
     return DeviceModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? 0,
-      macAddress: json['macAddress'] ?? '',
-      lastConnectedAt: json['lastConnectedAt'] ?? '',
-      autoUpdate: json['autoUpdate'] ?? 0,
-      board: json['board'] ?? '',
-      alias: json['alias'] ?? '',
-      agentId: json['agentId'] ?? '',
-      appVersion: json['appVersion'] ?? '',
-      sort: json['sort'] ?? 0,
-      updater: json['updater'] ?? 0,
-      updateDate: json['updateDate'] ?? '',
-      creator: json['creator'] ?? 0,
-      createDate: json['createDate'] ?? '',
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      macAddress: json['macAddress']?.toString() ?? '',
+      lastConnectedAt: json['lastConnectedAt']?.toString() ?? '',
+      autoUpdate: json['autoUpdate'] is int ? json['autoUpdate'] : 0,
+      board: json['board']?.toString() ?? '',
+      alias: json['alias']?.toString() ?? '',
+      agentId: json['agentId']?.toString() ?? '',
+      appVersion: json['appVersion']?.toString() ?? '',
+      sort: json['sort'] is int ? json['sort'] : 0,
+      updater: json['updater'],
+      updateDate: json['updateDate']?.toString() ?? '',
+      creator: json['creator']?.toString() ?? '',
+      createDate: json['createDate']?.toString() ?? '',
     );
   }
 

@@ -1,11 +1,11 @@
 import 'package:ai_bot/http/services/agent_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'dart:math'; // 添加Random用于模拟状态
-import '../../../pages/device/bot_connect_page.dart';
+
 import '../../../http/models/agent_model.dart';
 import '../../../http/models/device_model.dart';
 import '../../../pages/agent/aibot_setting_page.dart';
+import '../../../pages/device/bot_manager_page.dart';
 
 // 菜单项类型枚举
 enum MenuItemType {
@@ -551,23 +551,33 @@ class _HomeTabState extends State<HomeTab> {
             '暂无机器人',
             style: TextStyle(
               fontSize: 16,
-              color: const Color(0xFF333333),
+              color: Color(0xFF333333),
             ),
           ),
 
           const SizedBox(height: 20),
 
-          // 添加按钮
+          // 添加按钮 - 修改为跳转到设备管理页面
           SizedBox(
             width: 200,
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                // 导航到机器人连接页面
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (context) => const BotConnectPage()),
-                );
+                if (_selectedAgent != null) {
+                  // 跳转到设备管理页面
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => BotManagerPage(
+                        agentId: _selectedAgent!.id,
+                        agentName: _selectedAgent!.agentName,
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请先选择或创建一个智能体')),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3C8BFF),
@@ -578,7 +588,7 @@ class _HomeTabState extends State<HomeTab> {
                 elevation: 0,
               ),
               child: const Text(
-                '添加',
+                '添加设备',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -625,10 +635,22 @@ class _HomeTabState extends State<HomeTab> {
         
         return GestureDetector(
           onTap: () {
-            // TODO: 实现设备详情页面跳转
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('查看设备: ${bot.alias}')),
-            );
+            // 跳转到设备管理页面
+            if (_selectedAgent != null) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => BotManagerPage(
+                    agentId: _selectedAgent!.id,
+                    agentName: _selectedAgent!.agentName,
+                  ),
+                ),
+              ).then((_) {
+                // 返回时刷新设备列表
+                if (_selectedAgent != null) {
+                  _loadBindBotList(_selectedAgent!.id);
+                }
+              });
+            }
           },
           child: Container(
             decoration: BoxDecoration(
@@ -652,18 +674,9 @@ class _HomeTabState extends State<HomeTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        bot.alias.isNotEmpty ? bot.alias : '未命名设备',
+                        '面包板新版接线',
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        status.text,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: status.color,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

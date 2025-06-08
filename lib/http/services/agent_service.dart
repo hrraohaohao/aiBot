@@ -21,6 +21,7 @@ class AgentService extends ApiService {
   static const String _agentList = '/xiaozhi/mobile/agent/list'; //智能体列表
   static const String _BindBot = '/xiaozhi/device/bind'; //绑定设备
   static const String _getBindBotList = '/xiaozhi/device/bind'; //获取已绑定的设备
+  static const String _unbindBot = '/xiaozhi/device/unbind'; //解绑设备
 
   // 初始化
   Future<void> init() async {
@@ -117,6 +118,28 @@ class AgentService extends ApiService {
         }
         return [];
       },
+    );
+    
+    return response;
+  }
+  
+  // 解绑设备
+  Future<ApiResponse<dynamic>> unbindBot({
+    required String deviceId,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 请求数据
+    final Map<String, dynamic> data = {
+      'deviceId': deviceId,
+    };
+    
+    // 发送POST请求
+    final response = await post<dynamic>(
+      _unbindBot,
+      data: data,
+      fromJson: (json) => json,
     );
     
     return response;
