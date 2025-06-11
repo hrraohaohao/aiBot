@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../http/models/agent_model.dart';
+import '../../http/models/agent_template_model.dart';
 import '../../http/services/agent_service.dart';
 
 class AgentSettingPage extends StatefulWidget {
@@ -24,6 +25,12 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
   // 智能体数据
   AgentModel? _agentData;
   
+  // 角色模板列表
+  List<AgentTemplateModel> _templateList = [];
+  
+  // 当前选中的模板
+  AgentTemplateModel? _selectedTemplate;
+  
   // 输入控制器
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _personalityController = TextEditingController();
@@ -45,9 +52,42 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
     super.initState();
     _agentService.init();
     
+    // 加载角色模板列表
+    _loadTemplateList();
+    
     // 如果有agentId，则加载智能体数据
     if (widget.agentId != null) {
       _loadAgentData();
+    }
+  }
+  
+  // 加载角色模板列表
+  Future<void> _loadTemplateList() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final response = await _agentService.getAgentTemplateList();
+      
+      if (response.success && response.data != null) {
+        setState(() {
+          _templateList = response.data!;
+          // 不自动选择模板，保持未选择状态
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载角色模板失败: ${response.message}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载角色模板失败: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
   
@@ -58,29 +98,21 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
     });
     
     try {
-      // 使用getAgentList代替getAgentDetail，然后找到对应ID的智能体
-      final response = await _agentService.getAgentList();
+      // 使用getAgentDetail获取单个智能体详情
+      final response = await _agentService.getAgentDetail(widget.agentId!);
       
       if (response.success && response.data != null) {
-        // 从列表中查找指定ID的智能体
-        final agent = response.data!.firstWhere(
-          (agent) => agent.id == widget.agentId,
-          orElse: () => response.data!.first,
-        );
-        
         setState(() {
-          _agentData = agent;
+          _agentData = response.data;
           
           // 填充表单数据
           _nameController.text = _agentData!.agentName;
-          // 假设personality数据存储在systemPrompt中
+          // 填充角色介绍
           _personalityController.text = _agentData!.systemPrompt;
           
-          // 假设身份模版和音色需要从其他字段映射
-          _selectedIdentity = _identityOptions.first; // 默认选择第一项
-          _selectedVoice = _agentData!.ttsVoiceName.isNotEmpty 
-              ? _agentData!.ttsVoiceName 
-              : _voiceOptions.first;
+          // 不自动匹配模板，保持未选择状态
+          _selectedTemplate = null;
+          _selectedIdentity = null;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,29 +130,43 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
     }
   }
   
+  // 当角色模板变更时
+  void _onTemplateChanged(String? templateName) {
+    if (templateName == null) {
+      setState(() {
+        _selectedTemplate = null;
+        _selectedIdentity = null;
+        // 不自动填充角色介绍，保持当前内容
+      });
+      return;
+    }
+    
+    // 查找对应的模板
+    final template = _templateList.firstWhere(
+      (template) => template.agentName == templateName,
+      orElse: () => _templateList.first,
+    );
+    
+    setState(() {
+      _selectedTemplate = template;
+      _selectedIdentity = template.agentName;
+      
+      // 更新角色介绍
+      _personalityController.text = template.systemPrompt;
+    });
+  }
+  
   // 保存智能体设置
   Future<void> _saveAgentSettings() async {
     // 表单验证
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AI名称不能为空')),
+        const SnackBar(content: Text('助手昵称不能为空')),
       );
       return;
     }
     
-    if (_selectedIdentity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择身份模版')),
-      );
-      return;
-    }
-    
-    if (_selectedVoice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择音色')),
-      );
-      return;
-    }
+    // 不再强制要求选择角色模板
     
     setState(() {
       _isSubmitting = true;
@@ -192,51 +238,39 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 身份模版
-                  _buildSectionTitle('身份模版'),
+                  // 角色模版（原身份模版）
+                  _buildSectionTitle('角色模版'),
                   _buildDropdownSelector(
-                    value: _selectedIdentity ?? _identityOptions.first,
-                    items: _identityOptions,
+                    value: _selectedIdentity,
+                    items: _templateList.isEmpty 
+                        ? _identityOptions 
+                        : _templateList.map((template) => template.agentName).toList(),
                     onChanged: (value) {
-                      setState(() {
-                        _selectedIdentity = value;
-                      });
+                      _onTemplateChanged(value);
                     },
                   ),
                   const SizedBox(height: 24),
                   
-                  // AI名称
-                  _buildRequiredSectionTitle('AI名称', '(非唤醒词)'),
+                  // 助手昵称（原AI名称）
+                  _buildRequiredSectionTitle('助手昵称', '(非唤醒词)'),
                   _buildTextField(
                     controller: _nameController,
                     hintText: '请输入',
                   ),
                   const SizedBox(height: 24),
                   
-                  // 音色
-                  _buildRequiredSectionTitle('音色'),
-                  _buildDropdownSelector(
-                    value: _selectedVoice ?? _voiceOptions.first,
-                    items: _voiceOptions,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedVoice = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // 性格
-                  _buildSectionTitle('性格'),
+                  // 角色介绍（原性格）
+                  _buildSectionTitle('角色介绍'),
                   _buildTextField(
                     controller: _personalityController,
                     hintText: '请输入',
-                    helperText: '若不填，则根据身份将有默认性格',
+                    helperText: '若不填，则根据角色将有默认性格',
+                    height: 200,
                   ),
                   const SizedBox(height: 24),
                   
-                  // 记忆体
-                  _buildSectionTitle('记忆体', '(不可编辑)'),
+                  // 记忆（原记忆体）
+                  _buildSectionTitle('记忆', '(不可编辑)'),
                   _buildMemorySection(),
                   const SizedBox(height: 32),
                   
@@ -345,17 +379,22 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
     required TextEditingController controller,
     required String hintText,
     String? helperText,
+    double? height,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          height: height,
           decoration: BoxDecoration(
             color: const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
             controller: controller,
+            maxLines: height != null ? null : 1,
+            expands: height != null,
+            textAlignVertical: TextAlignVertical.top,
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(color: Colors.grey.shade500),
@@ -381,9 +420,9 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
   
   // 构建下拉选择器
   Widget _buildDropdownSelector({
-    required String value,
+    String? value,
     required List<String> items,
-    required Function(String) onChanged,
+    required Function(String?) onChanged,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -395,15 +434,12 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
+          hint: Text('请选择角色模板'),
           icon: const Icon(Icons.keyboard_arrow_down),
           iconSize: 24,
           elevation: 16,
           style: const TextStyle(color: Colors.black87, fontSize: 16),
-          onChanged: (newValue) {
-            if (newValue != null) {
-              onChanged(newValue);
-            }
-          },
+          onChanged: onChanged,
           items: items.map<DropdownMenuItem<String>>((String value) {
             return DropdownMenuItem<String>(
               value: value,
@@ -425,8 +461,7 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        _agentData?.summaryMemory ?? 
-        '之前约的猫的双鱼态度冷淡，回应简单不太友好，行为和态度奇怪难以建立正常聊天氛围。此次约的猫的双鱼主动找我，开始简单询问我在做什么，我回应之后又询问他近况，他表示要出去吃饭便匆匆结束对话，整个过程他的态度依然比较冷淡，没有太多深入交流的意愿，感觉他不太愿意和我聊天，交流总是很突然地开始又很突然地结束。',
+        _agentData?.summaryMemory ?? '',
         style: const TextStyle(
           fontSize: 14,
           color: Colors.black87,
