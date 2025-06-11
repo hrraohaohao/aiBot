@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../http/models/agent_model.dart';
+import '../../http/models/agent_detail_model.dart';
 import '../../http/models/agent_template_model.dart';
 import '../../http/models/model_name_item.dart';
 import '../../http/models/model_voice_item.dart';
+import '../../http/models/agent_update_request.dart';
+import '../../http/models/api_response.dart';
 import '../../http/services/agent_service.dart';
 
 class AgentSettingPage extends StatefulWidget {
@@ -25,7 +27,7 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
   bool _isSubmitting = false;
   
   // 智能体数据
-  AgentModel? _agentData;
+  AgentDetailModel? _agentData;
   
   // 角色模板列表
   List<AgentTemplateModel> _templateList = [];
@@ -293,15 +295,40 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
           // 填充角色介绍
           _personalityController.text = _agentData!.systemPrompt;
           
-          // 暂时不填充模型相关字段，保持为空
-          _selectedVAD = null;
-          _selectedASR = null;
-          _selectedLLM = null;
-          _selectedVLLM = null;
-          _selectedIntent = null;
-          _selectedMemory = null;
-          _selectedTTS = null;
-          _selectedVoice = null;
+          // 填充模型相关字段
+          _selectedVAD = _agentData!.vadModelId.isNotEmpty ? _agentData!.vadModelId : null;
+          _selectedASR = _agentData!.asrModelId.isNotEmpty ? _agentData!.asrModelId : null;
+          _selectedLLM = _agentData!.llmModelId.isNotEmpty ? _agentData!.llmModelId : null;
+          _selectedVLLM = _agentData!.vllmModelId.isNotEmpty ? _agentData!.vllmModelId : null;
+          _selectedIntent = _agentData!.intentModelId.isNotEmpty ? _agentData!.intentModelId : null;
+          _selectedMemory = _agentData!.memModelId.isNotEmpty ? _agentData!.memModelId : null;
+          _selectedTTS = _agentData!.ttsModelId.isNotEmpty ? _agentData!.ttsModelId : null;
+          
+          // 根据chatHistoryConf设置上传类型
+          switch (_agentData!.chatHistoryConf) {
+            case 1:
+              _uploadType = '上传文字';
+              break;
+            case 2:
+              _uploadType = '上传文字+语音';
+              break;
+            default:
+              // 默认为上传文字
+              _uploadType = '上传文字';
+              break;
+          }
+          
+          // 当TTS模型确定后，加载对应的音色列表并设置选中的音色
+          if (_selectedTTS != null) {
+            _loadVoiceModelList(_selectedTTS!).then((_) {
+              setState(() {
+                // 设置音色ID
+                if (_agentData!.ttsVoiceId.isNotEmpty) {
+                  _selectedVoice = _agentData!.ttsVoiceId;
+                }
+              });
+            });
+          }
           
           // 不自动匹配模板，保持未选择状态
           _selectedTemplate = null;
@@ -371,29 +398,55 @@ class _AgentSettingPageState extends State<AgentSettingPage> {
       return;
     }
     
-    // 不再强制要求选择角色模板
-    
     setState(() {
       _isSubmitting = true;
     });
     
     try {
-      // 这里需要扩展agent方法，包含所有模型选项
-      // 暂时只使用简化版本
-      final response = await _agentService.agent(
+      // 根据上传类型设置chatHistoryConf值
+      int chatHistoryConfValue = 0; // 默认值
+      if (_uploadType == '上传文字') {
+        chatHistoryConfValue = 1;
+      } else if (_uploadType == '上传文字+语音') {
+        chatHistoryConfValue = 2;
+      }
+      
+      // 准备请求数据
+      final request = AgentUpdateRequest(
         agentName: _nameController.text.trim(),
-        // 以下参数需要在AgentService.agent方法中添加
-        // vadModelId: _selectedVAD,
-        // asrModelId: _selectedASR,
-        // llmModelId: _selectedLLM,
-        // vllmModelId: _selectedVLLM,
-        // intentModelId: _selectedIntent,
-        // memModelId: _selectedMemory,
-        // ttsModelId: _selectedTTS,
-        // ttsVoiceId: _selectedVoice,
-        // systemPrompt: _personalityController.text,
-        // uploadType: _uploadType,
+        vadModelId: _selectedVAD ?? '',
+        asrModelId: _selectedASR ?? '',
+        llmModelId: _selectedLLM ?? '',
+        vllmModelId: _selectedVLLM ?? '',
+        intentModelId: _selectedIntent ?? '',
+        memModelId: _selectedMemory ?? '',
+        ttsModelId: _selectedTTS ?? '',
+        ttsVoiceId: _selectedVoice ?? '',
+        systemPrompt: _personalityController.text,
+        // 使用根据上传类型计算的chatHistoryConf值
+        chatHistoryConf: chatHistoryConfValue,
+        langCode: _agentData?.langCode ?? 'zh_CN',
+        language: _agentData?.language ?? '中文',
+        sort: _agentData?.sort ?? 0,
+        agentCode: _agentData?.agentCode ?? '',
+        summaryMemory: _agentData?.summaryMemory ?? '',
       );
+      
+      ApiResponse response;
+      
+      // 判断是创建还是更新
+      if (widget.agentId != null) {
+        // 更新现有智能体
+        response = await _agentService.updateAgent(
+          agentId: widget.agentId!,
+          request: request,
+        );
+      } else {
+        // 创建新智能体
+        response = await _agentService.agent(
+          agentName: _nameController.text.trim(),
+        );
+      }
       
       if (response.success) {
         ScaffoldMessenger.of(context).showSnackBar(

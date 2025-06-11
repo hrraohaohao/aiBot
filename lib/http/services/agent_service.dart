@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:dio/dio.dart';
 
 import 'api_service.dart';
 import '../models/api_response.dart';
@@ -9,6 +10,8 @@ import '../models/agent_template_model.dart';
 import '../../utils/token_manager.dart';
 import '../models/model_name_item.dart';
 import '../models/model_voice_item.dart';
+import '../models/agent_detail_model.dart';
+import '../models/agent_update_request.dart';
 
 class AgentService extends ApiService {
   // 单例模式
@@ -29,6 +32,8 @@ class AgentService extends ApiService {
   static const String _agentDetail = '/xiaozhi/mobile/agent'; //智能体详情
   static const String _modelsName = '/xiaozhi/models/names'; //获取模型名称
   static const String _modelsVoices = '/xiaozhi/models/{modelId}/voices'; //获取音色名称
+
+  static const String _agentPut = '/xiaozhi/agent/{id}'; //更新智能体
 
   // 初始化
   Future<void> init() async {
@@ -196,7 +201,7 @@ class AgentService extends ApiService {
   }
   
   // 获取智能体详情
-  Future<ApiResponse<AgentModel>> getAgentDetail(String agentId) async {
+  Future<ApiResponse<AgentDetailModel>> getAgentDetail(String agentId) async {
     // 确保每次请求前都添加Authorization头
     addAuthorizationHeader();
     
@@ -204,9 +209,9 @@ class AgentService extends ApiService {
     final String path = '$_agentDetail/$agentId';
     
     // 发送GET请求
-    final response = await get<AgentModel>(
+    final response = await get<AgentDetailModel>(
       path,
-      fromJson: (json) => AgentModel.fromJson(json),
+      fromJson: (json) => AgentDetailModel.fromJson(json),
     );
     
     return response;
@@ -294,5 +299,75 @@ class AgentService extends ApiService {
     }
     
     return response;
+  }
+  
+  // 更新智能体
+  Future<ApiResponse<dynamic>> updateAgent({
+    required String agentId,
+    required AgentUpdateRequest request,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的ID
+    final String path = _agentPut.replaceAll('{id}', agentId);
+    
+    // 使用Dio发送PUT请求
+    final dio = this.dio;
+    dio.options.headers['content-type'] = 'application/json';
+    
+    try {
+      final dioResponse = await dio.put(
+        path,
+        data: request.toJson(),
+      );
+      
+      // 处理响应
+      if (dioResponse.statusCode == 200 || dioResponse.statusCode == 201) {
+        final responseData = dioResponse.data;
+        
+        // 处理成功响应
+        if (responseData is Map) {
+          final code = responseData['code'];
+          if (code != null && code != 200 && code != 0) {
+            // 业务逻辑错误
+            return ApiResponse<dynamic>(
+              success: false,
+              code: code,
+              message: responseData['msg'] ?? responseData['message'] ?? '未知错误',
+            );
+          }
+          
+          // 成功响应
+          return ApiResponse<dynamic>(
+            success: true,
+            code: code ?? 200,
+            message: responseData['msg'] ?? responseData['message'] ?? 'Success',
+            data: responseData['data'],
+          );
+        }
+        
+        // 直接返回响应数据
+        return ApiResponse<dynamic>(
+          success: true,
+          message: 'Success',
+          data: responseData,
+        );
+      } else {
+        // 非成功状态码
+        return ApiResponse<dynamic>(
+          success: false,
+          code: dioResponse.statusCode ?? 500,
+          message: '请求失败，状态码: ${dioResponse.statusCode}',
+        );
+      }
+    } catch (e) {
+      // 请求异常
+      return ApiResponse<dynamic>(
+        success: false,
+        code: e is DioError ? e.response?.statusCode ?? 500 : 500,
+        message: e is DioError ? e.message ?? '未知错误' : e.toString(),
+      );
+    }
   }
 }
