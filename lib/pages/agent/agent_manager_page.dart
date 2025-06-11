@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../http/models/agent_model.dart';
 import '../../http/services/agent_service.dart';
 import 'aibot_setting_page.dart';
+import 'agent_setting_page.dart';
+import 'chat_history_page.dart';
 
 class AgentManagerPage extends StatefulWidget {
   const AgentManagerPage({Key? key}) : super(key: key);
@@ -412,14 +414,16 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // 跳转到智能体详情页面，并在返回时刷新数据
+            // 跳转到AI配置页面，传递智能体ID
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const AiBotSettingPage(),
+                builder: (context) => AgentSettingPage(agentId: agent.id),
               ),
-            ).then((_) {
-              // 从详情页面返回时刷新数据
-              _loadAgentList();
+            ).then((result) {
+              // 从配置页面返回时，如果数据有变更则刷新列表
+              if (result == true) {
+                _loadAgentList();
+              }
             });
           },
           child: Padding(
@@ -449,9 +453,9 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
                 // 统计信息行
                 Row(
                   children: [
-                    _buildInfoTag('${agent.deviceCount}个机器人', Icons.devices),
+                    _buildDeviceCountTag(agent),
                     const SizedBox(width: 16),
-                    _buildInfoTag('聊天记录', Icons.chat_bubble_outline),
+                    _buildChatHistoryTag(agent),
                   ],
                 ),
               ],
@@ -462,8 +466,8 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
     );
   }
   
-  // 构建标签
-  Widget _buildInfoTag(String text, IconData icon) {
+  // 构建设备数量标签
+  Widget _buildDeviceCountTag(AgentModel agent) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -473,20 +477,61 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
+          const Icon(
+            Icons.devices,
             size: 14,
             color: Colors.grey,
           ),
           const SizedBox(width: 4),
           Text(
-            text,
+            '${agent.deviceCount}个机器人',
             style: const TextStyle(
               fontSize: 12,
               color: Colors.grey,
             ),
           ),
         ],
+      ),
+    );
+  }
+  
+  // 构建聊天记录标签（可点击）
+  Widget _buildChatHistoryTag(AgentModel agent) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatHistoryPage(
+              agentId: agent.id,
+              agentName: agent.agentName,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.chat_bubble_outline,
+              size: 14,
+              color: Colors.grey,
+            ),
+            const SizedBox(width: 4),
+            const Text(
+              '聊天记录',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
