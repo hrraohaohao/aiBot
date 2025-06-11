@@ -7,6 +7,8 @@ import '../models/agent_model.dart';
 import '../models/device_model.dart';
 import '../models/agent_template_model.dart';
 import '../../utils/token_manager.dart';
+import '../models/model_name_item.dart';
+import '../models/model_voice_item.dart';
 
 class AgentService extends ApiService {
   // 单例模式
@@ -25,6 +27,8 @@ class AgentService extends ApiService {
   static const String _unbindBot = '/xiaozhi/device/unbind'; //解绑设备
   static const String _agentTemplate = '/xiaozhi/mobile/agent/template'; //智能体模板模板列表
   static const String _agentDetail = '/xiaozhi/mobile/agent'; //智能体详情
+  static const String _modelsName = '/xiaozhi/models/names'; //获取模型名称
+  static const String _modelsVoices = '/xiaozhi/models/{modelId}/voices'; //获取音色名称
 
   // 初始化
   Future<void> init() async {
@@ -204,6 +208,90 @@ class AgentService extends ApiService {
       path,
       fromJson: (json) => AgentModel.fromJson(json),
     );
+    
+    return response;
+  }
+  
+  // 获取模型名称列表
+  Future<ApiResponse<List<ModelNameItem>>> getModelsName({
+    String? modelType,
+    String? modelName,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 构建查询参数
+    final Map<String, dynamic> queryParameters = {};
+    if (modelType != null) {
+      queryParameters['modelType'] = modelType;
+    }
+    if (modelName != null) {
+      queryParameters['modelName'] = modelName;
+    }
+    
+    // 发送GET请求
+    final response = await get<List<ModelNameItem>>(
+      _modelsName,
+      queryParameters: queryParameters,
+      fromJson: (json) {
+        if (json is List) {
+          return json.map((item) => ModelNameItem.fromJson(item)).toList();
+        }
+        // 如果返回的是对象中包含list字段的情况
+        if (json is Map && json.containsKey('list')) {
+          final list = json['list'] as List;
+          return list.map((item) => ModelNameItem.fromJson(item)).toList();
+        }
+        return [];
+      },
+    );
+    
+    // 在返回前记录一下数据便于调试
+    if (response.success && response.data != null) {
+      debugPrint('获取到${response.data!.length}个模型名称');
+    }
+    
+    return response;
+  }
+  
+  // 获取模型音色列表
+  Future<ApiResponse<List<ModelVoiceItem>>> getModelVoices({
+    required String modelId,
+    String? name,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的模型ID
+    final String path = _modelsVoices.replaceAll('{modelId}', modelId);
+    
+    // 构建查询参数
+    final Map<String, dynamic> queryParameters = {};
+    if (name != null) {
+      queryParameters['name'] = name;
+    }
+    
+    // 发送GET请求
+    final response = await get<List<ModelVoiceItem>>(
+      path,
+      queryParameters: queryParameters,
+      fromJson: (json) {
+        if (json is List) {
+          return json.map((item) => ModelVoiceItem.fromJson(item)).toList();
+        }
+        // 如果返回的是对象中包含list字段的情况
+        if (json is Map && json.containsKey('list')) {
+          final list = json['list'] as List;
+          return list.map((item) => ModelVoiceItem.fromJson(item)).toList();
+        }
+        return [];
+      },
+    );
+    
+    // 在返回前记录一下数据便于调试
+    if (response.success && response.data != null) {
+      debugPrint('获取到${response.data!.length}个模型音色');
+    }
     
     return response;
   }
