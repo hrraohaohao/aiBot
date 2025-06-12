@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../http/services/user_service.dart';
 import '../../utils/user_manager.dart';
+import '../../utils/event_bus.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/profile_tab.dart';
+import 'dart:async';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -18,6 +20,9 @@ class _MainPageState extends State<MainPage> {
   // 用户服务和用户管理器
   final UserService _userService = UserService();
   final UserManager _userManager = UserManager();
+  
+  // 事件订阅
+  late StreamSubscription _subscription;
 
   @override
   void initState() {
@@ -25,6 +30,28 @@ class _MainPageState extends State<MainPage> {
     
     // 初始化
     _init();
+    
+    // 监听未授权事件
+    _subscription = EventBus.instance.on.listen((event) {
+      if (event is UnauthorizedEvent && mounted) {
+        debugPrint('MainPage 收到未授权事件: ${event.message}');
+        
+        // 显示提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('登录已过期: ${event.message}')),
+        );
+        
+        // 跳转到登录页
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    // 取消事件订阅
+    _subscription.cancel();
+    super.dispose();
   }
   
   // 初始化方法

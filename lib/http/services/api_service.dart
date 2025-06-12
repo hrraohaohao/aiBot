@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'dart:io';
 import 'package:dio/io.dart';
 import '../../utils/token_manager.dart';
+import 'package:flutter/material.dart';
+import '../../utils/event_bus.dart';
 
 class ApiService {
   final HttpClient _httpClient = HttpClient();
@@ -74,6 +76,21 @@ class ApiService {
         }
         return handler.next(options);
       },
+      onResponse: (response, handler) async {
+        // 检查业务状态码是否为401
+        if (response.data is Map && response.data['code'] == 401) {
+          debugPrint('业务状态码401，需要重新登录: ${response.data['msg']}');
+          
+          // 清除token
+          await TokenManager.clearToken();
+          
+          // 发送未授权事件
+          EventBus.instance.fire(UnauthorizedEvent(
+            response.data['msg'] ?? 'token is invalid, please log in again'
+          ));
+        }
+        return handler.next(response);
+      },
     ));
   }
   
@@ -96,6 +113,7 @@ class ApiService {
         if (responseData is Map) {
           // 检查业务状态码
           final code = responseData['code'];
+          
           if (code != null && code != 200 && code != 0) {
             // 业务逻辑错误
             return ApiResponse<T>(
@@ -175,6 +193,7 @@ class ApiService {
         if (responseData is Map) {
           // 检查业务状态码
           final code = responseData['code'];
+          
           if (code != null && code != 200 && code != 0) {
             // 业务逻辑错误
             return ApiResponse<T>(
