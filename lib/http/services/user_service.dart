@@ -1,6 +1,8 @@
 import 'api_service.dart';
 import '../models/api_response.dart';
 import '../models/login_response.dart';
+import '../models/user_model.dart';
+import 'package:flutter/foundation.dart';
 
 class UserService extends ApiService {
   // 单例模式
@@ -21,7 +23,7 @@ class UserService extends ApiService {
       '/xiaozhi/mobile/user/retrieve-password'; //找回密码
   static const String _changePassword =
       '/xiaozhi/mobile/user/change-password'; //修改密码
-  static const String _UserInfo = '/xiaozhi/mobile/user/info'; //用户信息
+  static const String _userInfo = '/xiaozhi/mobile/user/info'; //用户信息
 
   // 初始化
   Future<void> init() async {
@@ -96,5 +98,30 @@ class UserService extends ApiService {
     final response = await post<String>(_smsVerify,
         data: data, fromJson: (json) => json.toString());
     return response;
+  }
+  
+  // 获取用户信息
+  Future<ApiResponse<UserModel>> getUserInfo() async {
+    debugPrint('调用getUserInfo API...');
+    try {
+      final response = await get<UserModel>(
+        _userInfo,
+        fromJson: (json) {
+          debugPrint('解析用户信息JSON: $json');
+          return UserModel.fromJson(json);
+        },
+      );
+      
+      if (response.success && response.data != null) {
+        debugPrint('getUserInfo API返回成功: ${response.data}');
+      } else {
+        debugPrint('getUserInfo API返回失败: ${response.message}');
+      }
+      
+      return response;
+    } catch (e) {
+      debugPrint('getUserInfo API异常: $e');
+      rethrow;
+    }
   }
 }

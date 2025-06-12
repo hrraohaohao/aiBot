@@ -1,4 +1,6 @@
 import 'package:ai_bot/http/services/agent_service.dart';
+import 'package:ai_bot/http/services/user_service.dart';
+import 'package:ai_bot/utils/user_manager.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
@@ -70,6 +72,8 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   // 用户服务
   final AgentService _agentService = AgentService();
+  final UserService _userService = UserService();
+  final UserManager _userManager = UserManager();
 
   // 智能体列表
   List<AgentModel> _agentList = [];
@@ -93,8 +97,38 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _agentService.init();
+    _userService.init();
+    
+    // 获取用户信息
+    _loadUserInfo();
+    
     // 加载智能体列表
     _loadAgentList();
+  }
+
+  // 加载用户信息
+  Future<void> _loadUserInfo() async {
+    try {
+      debugPrint('开始获取用户信息...');
+      final response = await _userService.getUserInfo();
+      
+      debugPrint('获取用户信息响应: success=${response.success}, 有数据=${response.data != null}');
+      
+      if (response.success && response.data != null) {
+        debugPrint('准备保存用户信息: id=${response.data!.id}, username=${response.data!.username}');
+        
+        // 保存用户信息到本地
+        await _userManager.saveUserInfo(response.data!);
+        
+        // 验证是否成功保存
+        final savedInfo = _userManager.userInfo;
+        debugPrint('验证保存结果: ${savedInfo != null ? '成功' : '失败'}, username=${savedInfo?.username ?? '未知'}');
+      } else {
+        debugPrint('获取用户信息失败: ${response.message}');
+      }
+    } catch (e) {
+      debugPrint('获取用户信息异常: $e');
+    }
   }
 
   // 加载智能体列表
