@@ -71,6 +71,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   // 服务实例
   final AgentService _agentService = AgentService();
   
+  // 当前正在处理的音频ID
+  String? _processingAudioId;
+  
   @override
   void initState() {
     super.initState();
@@ -194,6 +197,73 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         audioId: item.audioId ?? '', // 保存audioId用于播放
       );
     }).toList();
+  }
+  
+  // 处理音频点击
+  Future<void> _handleAudioTap(String audioId) async {
+    // 如果已经在处理同一个音频，则忽略重复点击
+    if (_processingAudioId == audioId) {
+      return;
+    }
+    
+    // 设置处理状态
+    setState(() {
+      _processingAudioId = audioId;
+    });
+    
+    try {
+      // 调用获取音频UUID的接口
+      final uuidResponse = await _agentService.getAudioUuid(audioId: audioId);
+      
+      if (uuidResponse.success && uuidResponse.data != null && uuidResponse.data!.isNotEmpty) {
+        final uuid = uuidResponse.data!;
+        
+        // 获取音频播放URL
+        final audioUrl = _agentService.getAudioPlayUrl(uuid);
+        debugPrint('音频播放URL: $audioUrl');
+        
+        // 调用获取音频数据的接口
+        final audioDataResponse = await _agentService.getAudioData(uuid: uuid);
+        
+        if (audioDataResponse.success) {
+          debugPrint('音频数据获取成功');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('音频数据获取成功，可以播放')),
+            );
+          }
+        } else {
+          // 获取音频数据失败
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('获取音频数据失败: ${audioDataResponse.message}')),
+            );
+          }
+        }
+      } else {
+        // 获取UUID失败
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('获取音频UUID失败: ${uuidResponse.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      // 处理异常
+      debugPrint('处理音频异常: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('处理音频发生错误: $e')),
+        );
+      }
+    } finally {
+      // 无论成功失败，都清除处理状态
+      if (mounted) {
+        setState(() {
+          _processingAudioId = null;
+        });
+      }
+    }
   }
   
   @override
@@ -408,6 +478,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         : const Color(0xFFF5F5F5);
     final Color textColor = isUserMessage ? Colors.white : Colors.black87;
     
+    // 判断当前音频是否正在处理中
+    final bool isProcessing = message.hasAudio && _processingAudioId == message.audioId;
+    
     return Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.65,
@@ -425,16 +498,25 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
           if (message.hasAudio)
             GestureDetector(
               onTap: () {
-                // 这里可以添加播放音频的逻辑
-                debugPrint('播放音频: ${message.audioId}');
+                // 播放音频
+                _handleAudioTap(message.audioId);
               },
               child: Padding(
                 padding: const EdgeInsets.only(right: 6.0),
-                child: Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: isUserMessage ? Colors.white : Colors.blue,
-                  size: 20,
-                ),
+                child: isProcessing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isUserMessage ? Colors.white : Colors.blue,
+                        ),
+                      )
+                    : Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: isUserMessage ? Colors.white : Colors.blue,
+                        size: 20,
+                      ),
               ),
             ),
             

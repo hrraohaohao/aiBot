@@ -41,6 +41,8 @@ class AgentService extends ApiService {
   static const String _chatSessions = '/xiaozhi/mobile/agent/{id}/session/{sessionId}'; // 获取聊天会话内容
 
   static const String _chatDeviceHistory = '/xiaozhi/mobile/agent/device/chat-history'; // 获取设备的聊天会话内容
+  static const String _audioGet = '/xiaozhi/mobile/agent/audio/{audioId}'; // 获取音频下载ID
+  static const String _audioPlay = '/xiaozhi/mobile/agent/play/{uuid}'; // 获取音频数据
 
   // 初始化
   Future<void> init() async {
@@ -537,6 +539,115 @@ class AgentService extends ApiService {
     } catch (e) {
       debugPrint('获取设备聊天历史记录异常: $e');
       return ApiResponse<List<ChatDeviceHistoryItem>>(
+        success: false,
+        message: e.toString(),
+      );
+    }
+  }
+  
+  // 获取音频UUID
+  Future<ApiResponse<String>> getAudioUuid({
+    required String audioId,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的参数
+    String path = _audioGet.replaceAll('{audioId}', audioId);
+    
+    try {
+      // 发送POST请求
+      final dio = this.dio;
+      final dioResponse = await dio.post(path);
+      
+      if (dioResponse.statusCode == 200 || dioResponse.statusCode == 201) {
+        final responseData = dioResponse.data;
+        
+        // 处理成功响应
+        if (responseData is Map && responseData.containsKey('data')) {
+          final uuid = responseData['data']?.toString() ?? '';
+          debugPrint('获取到音频UUID: $uuid');
+          
+          return ApiResponse<String>(
+            success: true,
+            message: responseData['msg'] ?? 'Success',
+            data: uuid,
+          );
+        } 
+        
+        // 如果响应直接是字符串
+        else if (responseData is String) {
+          return ApiResponse<String>(
+            success: true,
+            message: 'Success',
+            data: responseData,
+          );
+        }
+        
+        // 如果无法解析
+        return ApiResponse<String>(
+          success: false,
+          message: '无法解析API响应数据',
+          data: '',
+        );
+      } else {
+        return ApiResponse<String>(
+          success: false,
+          message: '请求失败，状态码: ${dioResponse.statusCode}',
+          data: '',
+        );
+      }
+    } catch (e) {
+      debugPrint('获取音频UUID异常: $e');
+      return ApiResponse<String>(
+        success: false,
+        message: e.toString(),
+        data: '',
+      );
+    }
+  }
+  
+  // 获取音频播放URL
+  String getAudioPlayUrl(String uuid) {
+    // 替换路径中的参数
+    String path = _audioPlay.replaceAll('{uuid}', uuid);
+    // 返回完整的音频播放URL
+    return '$_baseUrl$path';
+  }
+  
+  // 获取音频数据
+  Future<ApiResponse<dynamic>> getAudioData({
+    required String uuid,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的参数
+    String path = _audioPlay.replaceAll('{uuid}', uuid);
+    
+    try {
+      // 发送GET请求
+      final dio = this.dio;
+      final dioResponse = await dio.get(path);
+      
+      // 检查状态码
+      if (dioResponse.statusCode == 200 || dioResponse.statusCode == 201) {
+        debugPrint('获取音频数据成功');
+        
+        return ApiResponse<dynamic>(
+          success: true,
+          message: 'Success',
+          data: dioResponse.data,
+        );
+      } else {
+        return ApiResponse<dynamic>(
+          success: false,
+          message: '请求失败，状态码: ${dioResponse.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('获取音频数据异常: $e');
+      return ApiResponse<dynamic>(
         success: false,
         message: e.toString(),
       );
