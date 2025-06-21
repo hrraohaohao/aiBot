@@ -464,28 +464,82 @@ class AgentService extends ApiService {
       'macAddress': macAddress,
     };
     
-    // 发送POST请求
-    final response = await post<List<ChatDeviceHistoryItem>>(
-      _chatDeviceHistory,
-      data: data,
-      fromJson: (json) {
-        if (json is List) {
-          return json.map((item) => ChatDeviceHistoryItem.fromJson(item)).toList();
+    try {
+      // 使用Dio直接发送请求，以便自行处理响应
+      final dio = this.dio;
+      final dioResponse = await dio.post(
+        _chatDeviceHistory,
+        data: data,
+      );
+      
+      if (dioResponse.statusCode == 200 || dioResponse.statusCode == 201) {
+        final responseData = dioResponse.data;
+        
+        // 处理成功响应
+        if (responseData is Map && responseData.containsKey('data')) {
+          final dataField = responseData['data'];
+          List<ChatDeviceHistoryItem> chatHistoryList = [];
+          
+          // 处理嵌套数组结构
+          if (dataField is List) {
+            // 如果是二维数组，获取第一个内部数组
+            if (dataField.isNotEmpty && dataField[0] is List) {
+              final innerList = dataField[0] as List;
+              chatHistoryList = innerList.map((item) => 
+                  ChatDeviceHistoryItem.fromJson(item)).toList();
+            }
+            // 如果是一维数组，直接处理
+            else {
+              chatHistoryList = dataField.map((item) => 
+                  ChatDeviceHistoryItem.fromJson(item)).toList();
+            }
+          }
+          
+          debugPrint('获取到${chatHistoryList.length}条设备聊天历史记录');
+          
+          return ApiResponse<List<ChatDeviceHistoryItem>>(
+            success: true,
+            message: responseData['msg'] ?? 'Success',
+            data: chatHistoryList,
+          );
+        } 
+        // 如果响应直接是列表
+        else if (responseData is List) {
+          // 如果是二维数组，获取第一个内部数组
+          List<dynamic> processedList = responseData;
+          if (responseData.isNotEmpty && responseData[0] is List) {
+            processedList = responseData[0] as List;
+          }
+          
+          final chatHistoryList = processedList.map((item) => 
+              ChatDeviceHistoryItem.fromJson(item)).toList();
+          
+          debugPrint('获取到${chatHistoryList.length}条设备聊天历史记录');
+          
+          return ApiResponse<List<ChatDeviceHistoryItem>>(
+            success: true,
+            message: 'Success',
+            data: chatHistoryList,
+          );
         }
-        // 如果返回的是对象中包含list字段的情况
-        if (json is Map && json.containsKey('list')) {
-          final list = json['list'] as List;
-          return list.map((item) => ChatDeviceHistoryItem.fromJson(item)).toList();
-        }
-        return [];
-      },
-    );
-    
-    // 在返回前记录一下数据便于调试
-    if (response.success && response.data != null) {
-      debugPrint('获取到${response.data!.length}条设备聊天历史记录');
+        
+        // 如果无法解析为列表
+        return ApiResponse<List<ChatDeviceHistoryItem>>(
+          success: false,
+          message: '无法解析API响应数据',
+        );
+      } else {
+        return ApiResponse<List<ChatDeviceHistoryItem>>(
+          success: false,
+          message: '请求失败，状态码: ${dioResponse.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('获取设备聊天历史记录异常: $e');
+      return ApiResponse<List<ChatDeviceHistoryItem>>(
+        success: false,
+        message: e.toString(),
+      );
     }
-    
-    return response;
   }
 }

@@ -24,6 +24,8 @@ class ChatMessage {
   final MessageType type;
   final MessageDirection direction;
   final bool hasWarning;
+  final bool hasAudio; // 是否有音频
+  final String audioId; // 音频ID
 
   ChatMessage({
     required this.id,
@@ -32,6 +34,8 @@ class ChatMessage {
     required this.type,
     required this.direction,
     this.hasWarning = false,
+    this.hasAudio = false,
+    this.audioId = '',
   });
 }
 
@@ -82,9 +86,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       _isLoading = true;
     });
     
-    // 如果有指定的macAddress，则使用设备聊天历史API
-    if (widget.macAddress.isNotEmpty) {
-      try {
+    try {
+      // 如果有指定的macAddress，则使用设备聊天历史API
+      if (widget.macAddress.isNotEmpty) {
         final response = await _agentService.getChatDeviceHistory(
           agentId: widget.agentId,
           macAddress: widget.macAddress,
@@ -97,59 +101,42 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
             _isLoading = false;
           });
           return;
+        } else {
+          // API调用成功但没有数据
+          setState(() {
+            _chatMessages = [];
+            _isLoading = false;
+          });
+          debugPrint('API返回成功但没有数据: ${response.message}');
+          return;
         }
-      } catch (e) {
-        debugPrint('获取设备聊天历史记录失败: $e');
+      } else {
+        // 没有macAddress参数，获取智能体的所有聊天会话
+        // 目前通过使用联系人选择器，但实际可能需要调用其他API
+        // 这里可以添加通过agentId获取所有会话的API调用
+        // 暂时显示空列表
+        setState(() {
+          _chatMessages = [];
+          _isLoading = false;
+        });
+        return;
       }
+    } catch (e) {
+      // 处理API调用异常
+      debugPrint('获取聊天历史记录失败: $e');
+      setState(() {
+        _chatMessages = [];
+        _isLoading = false;
+      });
+      
+      // 显示错误信息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('获取聊天记录失败: $e')),
+        );
+      }
+      return;
     }
-    
-    // 如果没有macAddress或者API调用失败，则使用模拟数据
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // 模拟聊天记录数据
-    final List<ChatMessage> messages = [
-      ChatMessage(
-        id: '1',
-        content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 15)),
-        type: MessageType.text,
-        direction: MessageDirection.send,
-      ),
-      ChatMessage(
-        id: '2',
-        content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 14)),
-        type: MessageType.text,
-        direction: MessageDirection.receive,
-      ),
-      ChatMessage(
-        id: '3',
-        content: '聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 10)),
-        type: MessageType.voice,
-        direction: MessageDirection.send,
-      ),
-      ChatMessage(
-        id: '4',
-        content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 5)),
-        type: MessageType.text,
-        direction: MessageDirection.receive,
-      ),
-      ChatMessage(
-        id: '5',
-        content: '聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 1)),
-        type: MessageType.voice,
-        direction: MessageDirection.send,
-        hasWarning: true,
-      ),
-    ];
-    
-    setState(() {
-      _chatMessages = messages;
-      _isLoading = false;
-    });
   }
   
   // 将设备聊天历史记录转换为聊天消息格式
@@ -166,30 +153,24 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
     });
     
     return historyItems.map((item) {
-      // 根据chatType确定消息类型
-      MessageType messageType = MessageType.text;
-      
-      // 判断是否为语音消息
-      if (item.audioId.isNotEmpty) {
-        messageType = MessageType.voice;
-      }
-      
       // 根据chatType确定消息方向
-      // chatType = "1"：用户消息，显示在左边
-      // chatType = "2"：智能体消息，显示在右边
+      // chatType = "1"：用户消息，显示在右边
+      // chatType = "2"：设备/智能体消息，显示在左边
       MessageDirection direction;
-      switch (item.chatType) {
+      String chatTypeString = item.getChatTypeString();
+      
+      switch (chatTypeString) {
         case "1":
-          direction = MessageDirection.receive; // 用户消息，显示在左侧
+          direction = MessageDirection.send; // 用户消息，显示在右侧
           break;
         case "2":
-          direction = MessageDirection.send; // 智能体消息，显示在右侧
+          direction = MessageDirection.receive; // 设备消息，显示在左侧
           break;
         default:
-          // 如果chatType不是"1"或"2"，根据内容判断方向
+          // 如果chatType无法识别，根据内容判断方向
           direction = item.content.contains('警告') 
-              ? MessageDirection.send 
-              : MessageDirection.receive;
+              ? MessageDirection.receive 
+              : MessageDirection.send;
       }
       
       DateTime time;
@@ -200,15 +181,17 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       }
       
       // 检查是否包含风险关键词，用于标记警告
-      final bool hasWarning = item.riskKeywords.isNotEmpty;
+      final bool hasWarning = item.riskKeywords != null && item.riskKeywords!.isNotEmpty;
       
       return ChatMessage(
         id: item.id.toString(),
         content: item.content,
         time: time,
-        type: messageType,
+        type: MessageType.text, // 所有消息类型都设为文本
         direction: direction,
         hasWarning: hasWarning,
+        hasAudio: item.audioId != null && item.audioId!.isNotEmpty, // 添加hasAudio标记
+        audioId: item.audioId ?? '', // 保存audioId用于播放
       );
     }).toList();
   }
@@ -369,9 +352,13 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         mainAxisAlignment: isUserMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 接收方头像（机器人）
+          // 设备头像（显示在左侧）
           if (!isUserMessage)
-            _buildAvatar('小', Colors.blue.shade200),
+            _buildAvatar(
+              '机',
+              Colors.blue.shade300,
+              Icons.smart_toy, // 使用机器人图标
+            ),
             
           const SizedBox(width: 8),
           
@@ -388,26 +375,27 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
           
           const SizedBox(width: 8),
           
-          // 发送方头像（用户）
+          // 用户头像（显示在右侧）
           if (isUserMessage)
-            _buildAvatar('饺', Colors.pink.shade300),
+            _buildAvatar(
+              '我',
+              Colors.pink.shade300,
+              Icons.person, // 使用人物图标
+            ),
         ],
       ),
     );
   }
   
   // 构建头像
-  Widget _buildAvatar(String text, Color color) {
+  Widget _buildAvatar(String text, Color color, IconData icon) {
     return CircleAvatar(
       radius: 20,
       backgroundColor: color,
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
+      child: Icon(
+        icon,
+        color: Colors.white,
+        size: 20,
       ),
     );
   }
@@ -428,28 +416,29 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         color: message.hasWarning ? const Color(0xFFFE7875) : bubbleColor,
         borderRadius: BorderRadius.circular(18),
       ),
-      padding: message.type == MessageType.voice
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
-          : const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 语音消息播放按钮
-          if (message.type == MessageType.voice)
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 20,
+          // 如果有音频，显示播放图标在文字前面
+          if (message.hasAudio)
+            GestureDetector(
+              onTap: () {
+                // 这里可以添加播放音频的逻辑
+                debugPrint('播放音频: ${message.audioId}');
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(right: 6.0),
+                child: Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: isUserMessage ? Colors.white : Colors.blue,
+                  size: 20,
+                ),
               ),
             ),
             
-          // 消息文本
+          // 消息文本内容
           Flexible(
             child: Text(
               message.content,
