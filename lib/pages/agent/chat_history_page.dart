@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../http/models/agent_model.dart';
+import '../../http/models/chat_device_history_item.dart';
+import '../../http/services/agent_service.dart';
 
 // 消息类型枚举
 enum MessageType {
@@ -59,12 +61,17 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   // 聊天对象列表
   final List<String> _contactList = ['饺子', '面包', '蛋糕', '小龙虾'];
   
-  // 聊天记录列表（模拟数据）
+  // 聊天记录列表
   late List<ChatMessage> _chatMessages;
+  
+  // 服务实例
+  final AgentService _agentService = AgentService();
   
   @override
   void initState() {
     super.initState();
+    // 初始化服务
+    _agentService.init();
     // 加载聊天记录
     _loadChatHistory();
   }
@@ -75,18 +82,39 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       _isLoading = true;
     });
     
-    // 模拟网络请求延迟
+    // 如果有指定的macAddress，则使用设备聊天历史API
+    if (widget.macAddress.isNotEmpty) {
+      try {
+        final response = await _agentService.getChatDeviceHistory(
+          agentId: widget.agentId,
+          macAddress: widget.macAddress,
+        );
+        
+        if (response.success && response.data != null) {
+          // 将API返回的数据转换为聊天消息格式
+          setState(() {
+            _chatMessages = _convertDeviceHistoryToChatMessages(response.data!);
+            _isLoading = false;
+          });
+          return;
+        }
+      } catch (e) {
+        debugPrint('获取设备聊天历史记录失败: $e');
+      }
+    }
+    
+    // 如果没有macAddress或者API调用失败，则使用模拟数据
     await Future.delayed(const Duration(seconds: 1));
     
     // 模拟聊天记录数据
     final List<ChatMessage> messages = [
-              ChatMessage(
-          id: '1',
-          content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
-          time: DateTime.now().subtract(const Duration(minutes: 15)),
-          type: MessageType.text,
-          direction: MessageDirection.send,
-        ),
+      ChatMessage(
+        id: '1',
+        content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
+        time: DateTime.now().subtract(const Duration(minutes: 15)),
+        type: MessageType.text,
+        direction: MessageDirection.send,
+      ),
       ChatMessage(
         id: '2',
         content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
@@ -122,6 +150,67 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       _chatMessages = messages;
       _isLoading = false;
     });
+  }
+  
+  // 将设备聊天历史记录转换为聊天消息格式
+  List<ChatMessage> _convertDeviceHistoryToChatMessages(List<ChatDeviceHistoryItem> historyItems) {
+    // 按照createdAt时间排序
+    historyItems.sort((a, b) {
+      try {
+        final timeA = DateTime.parse(a.createdAt);
+        final timeB = DateTime.parse(b.createdAt);
+        return timeA.compareTo(timeB);
+      } catch (e) {
+        return 0; // 如果解析失败，保持原顺序
+      }
+    });
+    
+    return historyItems.map((item) {
+      // 根据chatType确定消息类型
+      MessageType messageType = MessageType.text;
+      
+      // 判断是否为语音消息
+      if (item.audioId.isNotEmpty) {
+        messageType = MessageType.voice;
+      }
+      
+      // 根据chatType确定消息方向
+      // chatType = "1"：用户消息，显示在左边
+      // chatType = "2"：智能体消息，显示在右边
+      MessageDirection direction;
+      switch (item.chatType) {
+        case "1":
+          direction = MessageDirection.receive; // 用户消息，显示在左侧
+          break;
+        case "2":
+          direction = MessageDirection.send; // 智能体消息，显示在右侧
+          break;
+        default:
+          // 如果chatType不是"1"或"2"，根据内容判断方向
+          direction = item.content.contains('警告') 
+              ? MessageDirection.send 
+              : MessageDirection.receive;
+      }
+      
+      DateTime time;
+      try {
+        time = DateTime.parse(item.createdAt);
+      } catch (e) {
+        time = DateTime.now(); // 如果解析失败，使用当前时间
+      }
+      
+      // 检查是否包含风险关键词，用于标记警告
+      final bool hasWarning = item.riskKeywords.isNotEmpty;
+      
+      return ChatMessage(
+        id: item.id.toString(),
+        content: item.content,
+        time: time,
+        type: messageType,
+        direction: direction,
+        hasWarning: hasWarning,
+      );
+    }).toList();
   }
   
   @override

@@ -14,6 +14,7 @@ import '../models/agent_detail_model.dart';
 import '../models/agent_update_request.dart';
 import '../models/agent_session_item.dart';
 import '../models/chat_session_item.dart';
+import '../models/chat_device_history_item.dart';
 
 class AgentService extends ApiService {
   // 单例模式
@@ -38,6 +39,8 @@ class AgentService extends ApiService {
   static const String _agentPut = '/xiaozhi/agent/{id}'; //更新智能体
   static const String _agentSessions = '/xiaozhi/mobile/agent/{id}/sessions'; // 智能体会话列表
   static const String _chatSessions = '/xiaozhi/mobile/agent/{id}/session/{sessionId}'; // 获取聊天会话内容
+
+  static const String _chatDeviceHistory = '/xiaozhi/mobile/agent/device/chat-history'; // 获取设备的聊天会话内容
 
   // 初始化
   Future<void> init() async {
@@ -443,6 +446,45 @@ class AgentService extends ApiService {
         return [];
       },
     );
+    
+    return response;
+  }
+  
+  // 获取设备的聊天历史记录
+  Future<ApiResponse<List<ChatDeviceHistoryItem>>> getChatDeviceHistory({
+    required String agentId,
+    required String macAddress,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 请求数据
+    final Map<String, dynamic> data = {
+      'agentId': agentId,
+      'macAddress': macAddress,
+    };
+    
+    // 发送POST请求
+    final response = await post<List<ChatDeviceHistoryItem>>(
+      _chatDeviceHistory,
+      data: data,
+      fromJson: (json) {
+        if (json is List) {
+          return json.map((item) => ChatDeviceHistoryItem.fromJson(item)).toList();
+        }
+        // 如果返回的是对象中包含list字段的情况
+        if (json is Map && json.containsKey('list')) {
+          final list = json['list'] as List;
+          return list.map((item) => ChatDeviceHistoryItem.fromJson(item)).toList();
+        }
+        return [];
+      },
+    );
+    
+    // 在返回前记录一下数据便于调试
+    if (response.success && response.data != null) {
+      debugPrint('获取到${response.data!.length}条设备聊天历史记录');
+    }
     
     return response;
   }
