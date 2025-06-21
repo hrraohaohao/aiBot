@@ -36,11 +36,13 @@ class ChatMessage {
 class ChatHistoryPage extends StatefulWidget {
   final String agentId;
   final String agentName;
+  final String macAddress;
   
   const ChatHistoryPage({
     Key? key,
     required this.agentId,
     required this.agentName,
+    required this.macAddress,
   }) : super(key: key);
 
   @override
@@ -78,13 +80,13 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
     
     // 模拟聊天记录数据
     final List<ChatMessage> messages = [
-      ChatMessage(
-        id: '1',
-        content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
-        time: DateTime.now().subtract(const Duration(minutes: 15)),
-        type: MessageType.text,
-        direction: MessageDirection.send,
-      ),
+              ChatMessage(
+          id: '1',
+          content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
+          time: DateTime.now().subtract(const Duration(minutes: 15)),
+          type: MessageType.text,
+          direction: MessageDirection.send,
+        ),
       ChatMessage(
         id: '2',
         content: '聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容聊天内容',
@@ -134,9 +136,11 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          '聊天记录',
-          style: TextStyle(
+        title: Text(
+          widget.macAddress.isNotEmpty 
+              ? '聊天记录 - ${widget.agentName}'
+              : '聊天记录',
+          style: const TextStyle(
             color: Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -145,8 +149,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       ),
       body: Column(
         children: [
-          // 联系人选择器
-          _buildContactSelector(),
+          // 当macAddress为空时才显示联系人选择器
+          if (widget.macAddress.isEmpty)
+            _buildContactSelector(),
           
           // 聊天记录
           Expanded(

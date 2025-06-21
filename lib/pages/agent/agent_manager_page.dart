@@ -454,8 +454,9 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
                 Row(
                   children: [
                     _buildDeviceCountTag(agent),
-                    const SizedBox(width: 16),
-                    _buildChatHistoryTag(agent),
+                    // 暂时隐藏聊天记录组件
+                    // const SizedBox(width: 16),
+                    // _buildChatHistoryTag(agent),
                   ],
                 ),
               ],
@@ -504,6 +505,7 @@ class _AgentManagerPageState extends State<AgentManagerPage> with WidgetsBinding
             builder: (context) => ChatHistoryPage(
               agentId: agent.id,
               agentName: agent.agentName,
+              macAddress: '', // 从管理页面进入时使用空字符串作为默认值
             ),
           ),
         );

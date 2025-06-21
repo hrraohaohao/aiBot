@@ -12,6 +12,8 @@ import '../models/model_name_item.dart';
 import '../models/model_voice_item.dart';
 import '../models/agent_detail_model.dart';
 import '../models/agent_update_request.dart';
+import '../models/agent_session_item.dart';
+import '../models/chat_session_item.dart';
 
 class AgentService extends ApiService {
   // 单例模式
@@ -34,6 +36,8 @@ class AgentService extends ApiService {
   static const String _modelsVoices = '/xiaozhi/models/{modelId}/voices'; //获取音色名称
 
   static const String _agentPut = '/xiaozhi/agent/{id}'; //更新智能体
+  static const String _agentSessions = '/xiaozhi/mobile/agent/{id}/sessions'; // 智能体会话列表
+  static const String _chatSessions = '/xiaozhi/mobile/agent/{id}/session/{sessionId}'; // 获取聊天会话内容
 
   // 初始化
   Future<void> init() async {
@@ -369,5 +373,77 @@ class AgentService extends ApiService {
         message: e is DioError ? e.message ?? '未知错误' : e.toString(),
       );
     }
+  }
+
+  // 获取智能体会话列表
+  Future<ApiResponse<List<AgentSessionItem>>> getAgentSessions({
+    required String agentId,
+    int? page,
+    int limit = 20,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的ID
+    final String path = _agentSessions.replaceAll('{id}', agentId);
+    
+    // 构建查询参数
+    final Map<String, dynamic> queryParameters = {
+      'limit': limit,
+    };
+    
+    if (page != null) {
+      queryParameters['page'] = page;
+    }
+    
+    // 发送GET请求
+    final response = await get<List<AgentSessionItem>>(
+      path,
+      queryParameters: queryParameters,
+      fromJson: (json) {
+        if (json is List) {
+          return json.map((item) => AgentSessionItem.fromJson(item)).toList();
+        }
+        // 如果返回的是对象中包含list字段的情况
+        if (json is Map && json.containsKey('list')) {
+          final list = json['list'] as List;
+          return list.map((item) => AgentSessionItem.fromJson(item)).toList();
+        }
+        return [];
+      },
+    );
+    
+    return response;
+  }
+
+  // 获取聊天会话内容
+  Future<ApiResponse<List<ChatSessionItem>>> getChatSessions({
+    required String id,
+    required String sessionId,
+  }) async {
+    // 确保每次请求前都添加Authorization头
+    addAuthorizationHeader();
+    
+    // 替换路径中的参数
+    String path = _chatSessions.replaceAll('{id}', id);
+    path = path.replaceAll('{sessionId}', sessionId);
+    
+    // 发送GET请求
+    final response = await get<List<ChatSessionItem>>(
+      path,
+      fromJson: (json) {
+        if (json is List) {
+          return json.map((item) => ChatSessionItem.fromJson(item)).toList();
+        }
+        // 如果返回的是对象中包含list字段的情况
+        if (json is Map && json.containsKey('list')) {
+          final list = json['list'] as List;
+          return list.map((item) => ChatSessionItem.fromJson(item)).toList();
+        }
+        return [];
+      },
+    );
+    
+    return response;
   }
 }

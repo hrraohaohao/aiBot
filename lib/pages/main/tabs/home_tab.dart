@@ -9,6 +9,7 @@ import '../../../http/models/device_model.dart';
 import '../../../pages/agent/aibot_setting_page.dart';
 import '../../../pages/device/bot_manager_page.dart';
 import '../../agent/agent_manager_page.dart';
+import '../../agent/chat_history_page.dart';
 
 // 菜单项类型枚举
 enum MenuItemType {
@@ -739,26 +740,70 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
                 
-                // 如果是在线状态，显示提醒消息
-                if (status == DeviceStatus.online)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEEDED),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Text(
-                        '2条新的警告',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFF25B5B),
+                // 底部状态区域
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 左下角的聊天记录组件
+                      GestureDetector(
+                        onTap: () {
+                          // 导航到聊天历史记录页面
+                          if (_selectedAgent != null) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatHistoryPage(
+                                  agentId: _selectedAgent!.id,
+                                  agentName: _selectedAgent!.agentName,
+                                  macAddress: bot.macAddress,
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('无法获取智能体信息')),
+                            );
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 14,
+                              color: Color(0xFF666666),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              '聊天记录',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF666666),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+                      
+                      // 如果是在线状态，显示提醒消息
+                      if (status == DeviceStatus.online)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEEDED),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            '2条新的警告',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFF25B5B),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
