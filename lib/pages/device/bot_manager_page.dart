@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../../http/services/agent_service.dart';
 import '../../http/models/device_model.dart';
+import '../../pages/agent/chat_history_page.dart';
 import 'bot_connect_page.dart';
 
 // 设备状态枚举
@@ -628,9 +629,6 @@ class _BotManagerPageState extends State<BotManagerPage> {
               _selectDevice(device.id);
             } else {
               // TODO: 实现设备详情页面跳转
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('查看设备: ${device.alias}')),
-              );
             }
           },
           child: Container(
@@ -687,26 +685,68 @@ class _BotManagerPageState extends State<BotManagerPage> {
                       ),
                     ),
                     
-                    // 如果是在线状态，显示提醒消息
-                    if (status == DeviceStatus.online)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEEDED),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Text(
-                            '2条新的警告',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFF25B5B),
+                    // 底部操作区域
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // 左下角的聊天记录组件 - 增大热区
+                          InkWell(
+                            onTap: () {
+                              // 导航到聊天历史记录页面
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ChatHistoryPage(
+                                    agentId: widget.agentId,
+                                    agentName: widget.agentName,
+                                    macAddress: device.macAddress,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.chat_bubble_outline,
+                                    size: 14,
+                                    color: Color(0xFF666666),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    '聊天记录',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          
+                          // 如果是在线状态，显示提醒消息
+                          if (status == DeviceStatus.online)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEEDED),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Text(
+                                '2条新的警告',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFF25B5B),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
                 

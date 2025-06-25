@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../utils/token_manager.dart';
 import '../../../utils/user_manager.dart';
+import '../../../pages/agent/agent_manager_page.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -83,7 +84,12 @@ class _ProfileTabState extends State<ProfileTab> {
                               icon: Icons.smart_toy_outlined, 
                               title: '智能体管理',
                               onTap: () {
-                                // TODO: 进入智能体管理页面
+                                // 跳转到智能体管理页面
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const AgentManagerPage(),
+                                  ),
+                                );
                               }
                             ),
                           ],

@@ -746,8 +746,8 @@ class _HomeTabState extends State<HomeTab> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // 左下角的聊天记录组件
-                      GestureDetector(
+                      // 左下角的聊天记录组件 - 增大热区
+                      InkWell(
                         onTap: () {
                           // 导航到聊天历史记录页面
                           if (_selectedAgent != null) {
@@ -766,22 +766,26 @@ class _HomeTabState extends State<HomeTab> {
                             );
                           }
                         },
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 14,
-                              color: Color(0xFF666666),
-                            ),
-                            const SizedBox(width: 4),
-                            const Text(
-                              '聊天记录',
-                              style: TextStyle(
-                                fontSize: 12,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                size: 14,
                                 color: Color(0xFF666666),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              const Text(
+                                '聊天记录',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       

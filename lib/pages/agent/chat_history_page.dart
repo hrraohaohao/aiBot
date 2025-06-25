@@ -299,18 +299,48 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
               }
             } else {
               debugPrint('音频播放失败');
+              // 显示错误提示
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('音频播放失败，请稍后重试')),
+                );
+              }
             }
           } else {
             debugPrint('下载音频失败，状态码: ${response.statusCode}');
+            // 显示下载失败错误
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('下载音频失败，状态码: ${response.statusCode}')),
+              );
+            }
           }
         } catch (e) {
           debugPrint('播放音频异常: $e');
+          // 显示异常错误
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('播放音频异常: $e')),
+            );
+          }
         }
       } else {
         debugPrint('获取音频UUID失败: ${uuidResponse.message}');
+        // 显示获取UUID失败错误
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('获取音频信息失败: ${uuidResponse.message}')),
+          );
+        }
       }
     } catch (e) {
       debugPrint('处理音频异常: $e');
+      // 显示处理音频异常错误
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('处理音频发生错误: $e')),
+        );
+      }
     } finally {
       // 无论成功失败，都清除处理状态
       if (mounted) {
