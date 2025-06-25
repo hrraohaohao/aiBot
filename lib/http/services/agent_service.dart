@@ -615,6 +615,18 @@ class AgentService extends ApiService {
     return '$_baseUrl$path';
   }
   
+  // 获取带有授权头的音频播放URL
+  Future<String> getAudioPlayUrlWithAuth(String uuid) async {
+    // 获取token
+    final token = await TokenManager.getToken();
+    
+    // 替换路径中的参数
+    String path = _audioPlay.replaceAll('{uuid}', uuid);
+    
+    // 返回完整的音频播放URL，带有token
+    return '$_baseUrl$path?token=$token';
+  }
+  
   // 获取音频数据
   Future<ApiResponse<dynamic>> getAudioData({
     required String uuid,

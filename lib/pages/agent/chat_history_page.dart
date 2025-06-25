@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../../http/models/agent_model.dart';
 import '../../http/models/chat_device_history_item.dart';
 import '../../http/services/agent_service.dart';
+import '../../services/audio_player_service.dart';
+import '../../utils/token_manager.dart';
 
 // 消息类型枚举
 enum MessageType {
@@ -14,6 +20,13 @@ enum MessageType {
 enum MessageDirection {
   send,     // 发送方（用户）
   receive,  // 接收方（机器人）
+}
+
+// 音频状态枚举
+enum AudioState {
+  idle,      // 空闲状态
+  loading,   // 加载中（下载中）
+  playing,   // 播放中
 }
 
 // 聊天消息模型
@@ -70,15 +83,30 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   
   // 服务实例
   final AgentService _agentService = AgentService();
+  final AudioPlayerService _audioPlayerService = AudioPlayerService();
   
   // 当前正在处理的音频ID
   String? _processingAudioId;
+  
+  // 当前正在播放的音频ID
+  String? _playingAudioId;
   
   @override
   void initState() {
     super.initState();
     // 初始化服务
     _agentService.init();
+    _audioPlayerService.init();
+    
+    // 设置音频播放完成监听
+    _audioPlayerService.onPlayComplete = () {
+      if (mounted) {
+        setState(() {
+          _playingAudioId = null;
+        });
+      }
+    };
+    
     // 加载聊天记录
     _loadChatHistory();
   }
@@ -201,12 +229,26 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   
   // 处理音频点击
   Future<void> _handleAudioTap(String audioId) async {
+    // 如果正在播放这个音频，则停止播放
+    if (_playingAudioId == audioId) {
+      await _audioPlayerService.stop();
+      setState(() {
+        _playingAudioId = null;
+      });
+      return;
+    }
+    
     // 如果已经在处理同一个音频，则忽略重复点击
     if (_processingAudioId == audioId) {
       return;
     }
     
-    // 设置处理状态
+    // 如果有正在播放的音频，先停止
+    if (_audioPlayerService.isPlaying) {
+      await _audioPlayerService.stop();
+    }
+    
+    // 设置处理状态为加载中
     setState(() {
       _processingAudioId = audioId;
     });
@@ -218,44 +260,57 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
       if (uuidResponse.success && uuidResponse.data != null && uuidResponse.data!.isNotEmpty) {
         final uuid = uuidResponse.data!;
         
-        // 获取音频播放URL
-        final audioUrl = _agentService.getAudioPlayUrl(uuid);
-        debugPrint('音频播放URL: $audioUrl');
-        
-        // 调用获取音频数据的接口
-        final audioDataResponse = await _agentService.getAudioData(uuid: uuid);
-        
-        if (audioDataResponse.success) {
-          debugPrint('音频数据获取成功');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('音频数据获取成功，可以播放')),
-            );
+        try {
+          // 获取音频URL
+          final baseUrl = _agentService.getAudioPlayUrl(uuid);
+          debugPrint('音频播放URL: $baseUrl');
+          
+          // 获取token用于授权
+          final token = await TokenManager.getToken();
+          
+          // 创建带有授权头的HTTP请求
+          final headers = {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/octet-stream',
+          };
+          
+          // 下载音频文件
+          final response = await http.get(Uri.parse(baseUrl), headers: headers);
+          
+          if (response.statusCode == 200) {
+            // 获取临时目录
+            final tempDir = await getTemporaryDirectory();
+            final tempFile = File('${tempDir.path}/$audioId.wav');
+            
+            // 将音频数据写入临时文件
+            await tempFile.writeAsBytes(response.bodyBytes);
+            debugPrint('音频已保存到临时文件: ${tempFile.path}');
+            
+            // 从文件播放音频
+            final playResult = await _audioPlayerService.playFromFile(audioId, tempFile.path);
+            
+            if (playResult) {
+              debugPrint('音频开始播放: $audioId');
+              // 更新状态为播放中
+              if (mounted) {
+                setState(() {
+                  _playingAudioId = audioId;
+                });
+              }
+            } else {
+              debugPrint('音频播放失败');
+            }
+          } else {
+            debugPrint('下载音频失败，状态码: ${response.statusCode}');
           }
-        } else {
-          // 获取音频数据失败
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('获取音频数据失败: ${audioDataResponse.message}')),
-            );
-          }
+        } catch (e) {
+          debugPrint('播放音频异常: $e');
         }
       } else {
-        // 获取UUID失败
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('获取音频UUID失败: ${uuidResponse.message}')),
-          );
-        }
+        debugPrint('获取音频UUID失败: ${uuidResponse.message}');
       }
     } catch (e) {
-      // 处理异常
       debugPrint('处理音频异常: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('处理音频发生错误: $e')),
-        );
-      }
     } finally {
       // 无论成功失败，都清除处理状态
       if (mounted) {
@@ -264,6 +319,14 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         });
       }
     }
+  }
+  
+  @override
+  void dispose() {
+    // 释放音频播放器资源
+    _audioPlayerService.onPlayComplete = null;
+    _audioPlayerService.dispose();
+    super.dispose();
   }
   
   @override
@@ -478,8 +541,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
         : const Color(0xFFF5F5F5);
     final Color textColor = isUserMessage ? Colors.white : Colors.black87;
     
-    // 判断当前音频是否正在处理中
-    final bool isProcessing = message.hasAudio && _processingAudioId == message.audioId;
+    // 判断音频状态
+    final bool isLoading = message.hasAudio && _processingAudioId == message.audioId;
+    final bool isPlaying = message.hasAudio && _playingAudioId == message.audioId;
     
     return Container(
       constraints: BoxConstraints(
@@ -503,7 +567,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
               },
               child: Padding(
                 padding: const EdgeInsets.only(right: 6.0),
-                child: isProcessing
+                child: isLoading
                     ? SizedBox(
                         width: 20,
                         height: 20,
@@ -512,11 +576,17 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
                           color: isUserMessage ? Colors.white : Colors.blue,
                         ),
                       )
-                    : Icon(
-                        Icons.play_circle_fill_rounded,
-                        color: isUserMessage ? Colors.white : Colors.blue,
-                        size: 20,
-                      ),
+                    : isPlaying
+                        ? Icon(
+                            Icons.pause_circle_filled_rounded,
+                            color: isUserMessage ? Colors.white : Colors.blue,
+                            size: 20,
+                          )
+                        : Icon(
+                            Icons.play_circle_fill_rounded,
+                            color: isUserMessage ? Colors.white : Colors.blue,
+                            size: 20,
+                          ),
               ),
             ),
             
