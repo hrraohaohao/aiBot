@@ -41,6 +41,13 @@ dependencies:
   # shared_preferences: ^2.2.3  # 注释掉当前版本
   # shared_preferences: ^2.2.2 # 暂时注释掉，解决iOS编译问题
   # path_provider: ^2.0.15  # 暂时移除path_provider依赖
+  
+  # WiFi配网相关依赖
+  wifi_scan: ^0.4.0+1
+  wifi_iot: ^0.3.18
+  webview_flutter: ^4.2.2
+  permission_handler: ^10.4.3
+  app_settings: ^5.1.1
 
 dev_dependencies:
   flutter_test:

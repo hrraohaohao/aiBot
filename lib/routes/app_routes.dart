@@ -4,6 +4,7 @@ import '../pages/login/login_page.dart';
 import '../pages/login/register_page.dart';
 import '../pages/login/verification_page.dart';
 import '../pages/login/set_password_page.dart';
+import '../pages/wifi_config/wifi_config_page.dart';
 
 class AppRoutes {
   // 路由名称常量
@@ -13,12 +14,14 @@ class AppRoutes {
   static const String register = '/register';
   static const String verification = '/verification';
   static const String setPassword = '/set_password';
+  static const String wifiConfig = '/wifi_config';
   
   // 路由表
   static Map<String, WidgetBuilder> get routes => {
     login: (context) => const LoginPage(),
     register: (context) => const RegisterPage(),
     main: (context) => const MainPage(),
+    wifiConfig: (context) => const WiFiConfigPage(),
   };
   
   // 路由生成器

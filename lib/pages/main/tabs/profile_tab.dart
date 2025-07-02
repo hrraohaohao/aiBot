@@ -92,6 +92,16 @@ class _ProfileTabState extends State<ProfileTab> {
                                 );
                               }
                             ),
+                            
+                            // WiFi配网
+                            _buildSettingItem(
+                              icon: Icons.wifi, 
+                              title: 'WiFi配网',
+                              onTap: () {
+                                // 跳转到WiFi配网页面
+                                Navigator.of(context).pushNamed('/wifi_config');
+                              }
+                            ),
                           ],
                         ),
                       ),

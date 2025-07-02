@@ -8,6 +8,21 @@
     
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     
+    <!-- WiFi配网相关权限 -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- 精确位置权限 - 不设置maxSdkVersion以确保在所有Android版本上都可请求 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Android 12+需要的附近设备权限 -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" android:minSdkVersion="33" />
+    
+    <!-- 告知系统该应用需要位置权限来执行WiFi扫描 -->
+    <uses-feature android:name="android.hardware.wifi" android:required="true" />
+    <uses-feature android:name="android.hardware.location" android:required="true" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    
     <application
         android:label="ai_bot"
         android:name="${applicationName}"
