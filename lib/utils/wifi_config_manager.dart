@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:wifi_iot/wifi_iot.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/services.dart';
 
 /// WiFi配置管理器，负责管理WiFi连接和配置
 class WiFiConfigManager {
@@ -12,132 +13,145 @@ class WiFiConfigManager {
   // 连接超时时间(秒)
   static const int _connectionTimeout = 15;
   
-  // 连接到指定SSID的WiFi
-  Future<bool> connectToWifi(String ssid) async {
+  // 原生平台通道
+  static const platform = MethodChannel('com.example.ai_bot/wifi_provision');
+  
+  /// 连接到WiFi网络
+  Future<bool> connectToWifi(String ssid, String? password) async {
     try {
       debugPrint('尝试连接到WiFi: $ssid');
       
-      // 检查权限
-      final locationStatus = await Permission.location.request();
-      if (!locationStatus.isGranted) {
-        debugPrint('缺少位置权限，无法连接WiFi');
+      // 检查WiFi权限
+      if (!await checkWiFiPermission()) {
+        debugPrint('WiFi权限未授予');
         return false;
       }
       
-      // 开启WiFi（如果未开启）
+      // 检查WiFi是否开启
       if (!(await WiFiForIoTPlugin.isEnabled())) {
-        await WiFiForIoTPlugin.setEnabled(true);
-        // 等待WiFi启动
-        await Future.delayed(const Duration(seconds: 2));
+        debugPrint('WiFi未开启');
+        return false;
       }
       
-      // 使用Android平台相关方法连接WiFi
-      // 注：实际情况可能需要更复杂的逻辑和错误处理
+      // 确定安全类型
+      final NetworkSecurity security = (password == null || password.isEmpty) 
+          ? NetworkSecurity.NONE 
+          : NetworkSecurity.WPA;
+      
+      // 连接到WiFi
       try {
-        // 尝试直接连接（无密码，通常设备热点是开放的）
+        // 使用Flutter插件连接WiFi
         final result = await WiFiForIoTPlugin.connect(
           ssid,
-          password: '',
+          password: password ?? '',
           joinOnce: true,
-          security: NetworkSecurity.NONE,
+          security: security,
+          timeoutInSeconds: _connectionTimeout,
         );
         
-        if (result) {
-          // 等待连接完成
-          final connected = await _waitForConnection(ssid);
-          return connected;
-        }
+        debugPrint('WiFi连接结果: $result');
+        
+        // 等待连接稳定
+        await Future.delayed(const Duration(seconds: 2));
+        
+        return result;
       } catch (e) {
-        debugPrint('使用WiFiIoT插件连接失败: $e');
+        debugPrint('使用WiFiForIoTPlugin连接失败: $e');
+        
+        // 尝试使用原生方法连接
+        try {
+          final result = await platform.invokeMethod('connectToWiFi', {
+            'ssid': ssid,
+            'password': password ?? '',
+          });
+          debugPrint('使用原生方法连接结果: $result');
+          
+          // 等待连接稳定
+          await Future.delayed(const Duration(seconds: 2));
+          
+          return result == true;
+        } catch (e) {
+          debugPrint('使用原生方法连接失败: $e');
+          return false;
+        }
       }
-      
-      // 如果上面方法失败，尝试通过平台通道方式连接
-      // 注意：这部分代码需要配合原生代码使用，这里只是示例
-      return await _connectViaMethodChannel(ssid);
     } catch (e) {
-      debugPrint('连接WiFi时出错: $e');
+      debugPrint('连接WiFi出错: $e');
       return false;
     }
   }
   
-  // 通过方法通道连接WiFi
-  Future<bool> _connectViaMethodChannel(String ssid) async {
-    const methodChannel = MethodChannel('com.example.ai_bot/wifi');
-    try {
-      final result = await methodChannel.invokeMethod('connectToWifi', {
-        'ssid': ssid,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('平台方法调用失败: ${e.message}');
-      return false;
+  /// 检查WiFi权限
+  Future<bool> checkWiFiPermission() async {
+    if (Platform.isAndroid) {
+      final locationPermission = await Permission.locationWhenInUse.status;
+      if (!locationPermission.isGranted) {
+        return false;
+      }
+      
+      // Android 12+需要附近设备权限
+      if (await Permission.nearbyWifiDevices.shouldShowRequestRationale) {
+        final nearbyDevicesPermission = await Permission.nearbyWifiDevices.status;
+        if (!nearbyDevicesPermission.isGranted) {
+          return false;
+        }
+      }
     }
+    return true;
   }
   
-  // 等待连接完成
-  Future<bool> _waitForConnection(String ssid) async {
-    final completer = Completer<bool>();
-    int attempts = 0;
-    
-    // 创建定时器检查连接状态
-    Timer.periodic(const Duration(seconds: 1), (timer) async {
-      attempts++;
+  /// 请求WiFi相关权限
+  Future<bool> requestWiFiPermission() async {
+    if (Platform.isAndroid) {
+      final locationStatus = await Permission.locationWhenInUse.request();
+      if (!locationStatus.isGranted) {
+        return false;
+      }
       
+      // Android 12+需要附近设备权限
+      if (await Permission.nearbyWifiDevices.shouldShowRequestRationale) {
+        final nearbyDevicesStatus = await Permission.nearbyWifiDevices.request();
+        if (!nearbyDevicesStatus.isGranted) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  
+  /// 获取设备IP地址
+  Future<String> getDeviceIp() async {
+    // 直接返回固定IP
+    return '192.168.4.1';
+  }
+  
+  /// 获取当前连接的WiFi SSID
+  Future<String?> getCurrentWifiSSID() async {
+    try {
+      // 尝试使用Flutter插件获取当前SSID
       try {
-        final currentSsid = await WiFiForIoTPlugin.getSSID();
-        debugPrint('当前SSID: $currentSsid, 目标SSID: $ssid');
-        
-        // 检查是否连接到了目标网络
-        if (currentSsid == ssid) {
-          timer.cancel();
-          completer.complete(true);
-          return;
+        final ssid = await WiFiForIoTPlugin.getSSID();
+        if (ssid != null && ssid.isNotEmpty && ssid != "<unknown ssid>") {
+          return ssid;
         }
       } catch (e) {
-        debugPrint('检查WiFi连接状态时出错: $e');
+        debugPrint('使用WiFiForIoTPlugin获取SSID失败: $e');
       }
       
-      // 超时处理
-      if (attempts >= _connectionTimeout) {
-        timer.cancel();
-        completer.complete(false);
-      }
-    });
-    
-    return completer.future;
-  }
-  
-  // 获取设备IP地址
-  Future<String?> getDeviceIp() async {
-    try {
-      // 等待网络连接稳定
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // 尝试获取网关地址，通常设备会作为网关
-      String? gatewayIP;
+      // 尝试使用原生方法获取SSID
       try {
-        // 尝试获取当前连接的SSID，确认是否成功连接
-        final currentSsid = await WiFiForIoTPlugin.getSSID();
-        debugPrint('当前已连接到: $currentSsid');
-        
-        // 使用固定IP地址
-        gatewayIP = _defaultDeviceIp;
+        final ssid = await platform.invokeMethod('getCurrentWifiSSID');
+        if (ssid != null && ssid.toString().isNotEmpty) {
+          return ssid.toString();
+        }
       } catch (e) {
-        debugPrint('获取SSID失败: $e');
+        debugPrint('使用原生方法获取SSID失败: $e');
       }
       
-      if (gatewayIP != null && gatewayIP.isNotEmpty) {
-        debugPrint('使用IP地址: $gatewayIP');
-        return gatewayIP;
-      }
-      
-      // 如果无法获取网关地址，返回默认设备IP
-      debugPrint('使用默认设备IP: $_defaultDeviceIp');
-      return _defaultDeviceIp;
+      return null;
     } catch (e) {
-      debugPrint('获取设备IP时出错: $e');
-      // 返回默认IP
-      return _defaultDeviceIp;
+      debugPrint('获取当前WiFi SSID出错: $e');
+      return null;
     }
   }
 } 

@@ -33,7 +33,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.2
-  http: ^0.13.5
+  http: ^0.13.6
   dio: ^5.8.0+1
   # dio_web_adapter: ^2.1.1  # 这个插件仅用于Flutter Web，Android上不需要
   shared_preferences: ^2.0.15  # 使用较稳定的版本

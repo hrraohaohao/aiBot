@@ -1,12 +1,25 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wifi_scan/wifi_scan.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:http/http.dart' as http;
 import '../../utils/wifi_config_manager.dart';
 
+// WiFi连接状态枚举
+enum ConnectionStatus {
+  disconnected,
+  scanning,
+  connecting,
+  connected,
+  error
+}
+
+/// WiFi配置页面
 class WiFiConfigPage extends StatefulWidget {
-  const WiFiConfigPage({super.key});
+  const WiFiConfigPage({Key? key}) : super(key: key);
 
   @override
   State<WiFiConfigPage> createState() => _WiFiConfigPageState();
@@ -14,18 +27,22 @@ class WiFiConfigPage extends StatefulWidget {
 
 class _WiFiConfigPageState extends State<WiFiConfigPage> {
   // WiFi配置管理器
-  final WiFiConfigManager _wifiManager = WiFiConfigManager();
+  final _wifiManager = WiFiConfigManager();
   
   // 状态变量
+  List<WiFiAccessPoint> _accessPoints = [];
   bool _isScanning = false;
   bool _isConnecting = false;
   bool _showWebView = false;
-  List<WiFiAccessPoint> _accessPoints = [];
   String? _selectedSSID;
   String? _errorMsg;
+  ConnectionStatus _connectionStatus = ConnectionStatus.disconnected;
   
   // WebView控制器
   late final WebViewController _webViewController;
+  
+  // 当前连接的WiFi
+  String? _currentConnectedSSID;
   
   @override
   void initState() {
@@ -52,58 +69,50 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
     
     // 请求所有必要的权限并扫描WiFi
     _requestAllPermissionsAndScan();
+    
+    // 获取当前连接的WiFi
+    _getCurrentWifi();
   }
   
-  // 请求所有必要的权限并扫描WiFi
+  // 请求所有必要权限并扫描
   Future<void> _requestAllPermissionsAndScan() async {
     setState(() {
       _isScanning = true;
       _errorMsg = null;
     });
-    
+
     try {
-      debugPrint('检查并请求所有必要权限...');
-      
-      // 检查Android版本，请求相应的权限
-      final androidSdkVersion = await _getAndroidSdkVersion();
-      debugPrint('Android SDK 版本: $androidSdkVersion');
-      
-      // 请求精确位置权限 (必要的)
+      // 请求位置权限
       final locationStatus = await Permission.locationWhenInUse.request();
-      debugPrint('位置权限状态: $locationStatus');
-      
-      // 尝试请求更精确的位置权限
-      if (locationStatus.isGranted) {
-        final precisLocationStatus = await Permission.location.request();
-        debugPrint('精确位置权限状态: $precisLocationStatus');
-      }
-      
-      // Android 12 (API 31+) 还需要附近设备权限
-      if (androidSdkVersion >= 31) {
-        final nearbyDevicesStatus = await Permission.nearbyWifiDevices.request();
-        debugPrint('附近WiFi设备权限状态: $nearbyDevicesStatus');
-      }
-      
-      // 检查位置权限是否已授予
-      if (!await Permission.location.isGranted) {
+      if (!locationStatus.isGranted) {
         setState(() {
-          _errorMsg = '需要位置权限来扫描WiFi';
+          _errorMsg = '需要位置权限才能扫描WiFi';
           _isScanning = false;
         });
-        _showPermissionExplanationDialog(
-          title: '需要位置权限',
-          content: 'Android系统要求应用必须有位置权限才能扫描WiFi网络。\n\n请在设置中授予"位置信息"权限，并选择"精确"和"始终允许"选项。',
-          onOpenSettings: _openAppSettings,
-        );
         return;
+      }
+
+      // 在Android 12+上，还需要附近设备权限
+      if (Platform.isAndroid && await Permission.nearbyWifiDevices.shouldShowRequestRationale) {
+        final nearbyDevicesStatus = await Permission.nearbyWifiDevices.request();
+        if (!nearbyDevicesStatus.isGranted) {
+          setState(() {
+            _errorMsg = '需要附近设备权限才能扫描WiFi';
+            _isScanning = false;
+          });
+          return;
+        }
       }
       
       // 现在尝试扫描WiFi
-      await _scanWifi();
+      await _scanWiFi();
+      
+      // 同时刷新当前连接的WiFi
+      await _getCurrentWifi();
     } catch (e) {
       debugPrint('权限请求过程出错: $e');
       setState(() {
-        _errorMsg = '准备WiFi扫描时出错: $e';
+        _errorMsg = '权限请求过程出错: $e';
         _isScanning = false;
       });
     }
@@ -164,102 +173,77 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
     }
   }
   
-  // 扫描WiFi
-  Future<void> _scanWifi() async {
+  // 扫描WiFi网络
+  Future<void> _scanWiFi() async {
+    setState(() {
+      _isScanning = true;
+      _errorMsg = null;
+    });
+
     try {
-      debugPrint('开始WiFi扫描准备...');
+      // 检查是否可以获取扫描结果
+      final canGetScannedResults = await WiFiScan.instance.canGetScannedResults();
+      debugPrint('WiFi扫描状态: $canGetScannedResults');
       
-      // 检查是否可以扫描
-      final canScan = await WiFiScan.instance.canStartScan();
-      debugPrint('WiFi扫描状态检查结果: $canScan');
-      
-      if (canScan == CanStartScan.yes) {
-        debugPrint('条件满足，开始WiFi扫描...');
-        
-        // 开始扫描
-        final result = await WiFiScan.instance.startScan();
-        debugPrint('WiFi扫描启动结果: $result');
-        
-        if (result) {
-          // 给扫描一些时间完成
-          debugPrint('等待扫描完成...');
-          await Future.delayed(const Duration(seconds: 2));
-          
-          // 获取扫描结果
-          debugPrint('获取WiFi扫描列表...');
-          final accessPoints = await WiFiScan.instance.getScannedResults();
-          debugPrint('获取到 ${accessPoints.length} 个WiFi网络');
-          
-          setState(() {
-            // 显示所有可用网络，并标记设备热点
-            _accessPoints = accessPoints.where((ap) => ap.ssid.isNotEmpty).toList();
-            debugPrint('过滤后剩余 ${_accessPoints.length} 个WiFi网络');
-            
-            // 如果没有找到可用网络
-            if (_accessPoints.isEmpty) {
-              _errorMsg = '未找到可用的WiFi网络，请确保附近有设备热点';
-            } else {
-              _errorMsg = null;
-            }
-            _isScanning = false;
-          });
-        } else {
-          setState(() {
-            _errorMsg = '无法启动WiFi扫描，请检查WiFi是否开启';
-            _isScanning = false;
-          });
-          _showWifiServiceDialog();
-        }
-      } else if (canScan == CanStartScan.noLocationPermissionUpgradeAccuracy) {
-        // 特殊处理：需要精确位置权限
+      // 如果不能获取扫描结果，显示错误
+      if (canGetScannedResults != CanGetScannedResults.yes) {
         setState(() {
+          _errorMsg = '无法获取WiFi扫描结果: $canGetScannedResults';
           _isScanning = false;
-          _errorMsg = '需要精确位置权限';
         });
-        
-        debugPrint('需要升级到精确位置权限');
-        _showPermissionExplanationDialog(
-          title: '需要精确位置权限',
-          content: '扫描WiFi需要"精确位置权限"而不仅仅是"大致位置权限"。\n\n'
-              '请在设置中将位置权限设置为"精确位置"并确保选择"始终允许"。',
-          onOpenSettings: _openAppSettings,
-        );
-      } else {
-        // 无法扫描，处理不同的错误情况
-        setState(() {
-          _isScanning = false;
-          _errorMsg = '无法扫描WiFi（状态: $canScan）';
-        });
-        
-        debugPrint('WiFi扫描错误状态: $canScan');
-        
-        // 检查WiFi是否开启
-        bool wifiEnabled = false;
-        try {
-          // 这里我们无法确认WiFi是否启用，因此假设问题在权限
-          wifiEnabled = true;  // 假设已开启
-        } catch (e) {
-          debugPrint('检查WiFi状态失败: $e');
-        }
-        
-        if (!wifiEnabled) {
-          debugPrint('WiFi未开启');
-          _showWifiServiceDialog();
-          return;
-        }
-        
-        // 如果WiFi已开启但仍然无法扫描，可能是权限问题
-        debugPrint('权限问题导致无法扫描WiFi');
-        _showPermissionExplanationDialog(
-          title: 'WiFi扫描受限',
-          content: '虽然WiFi已开启，但应用仍无法扫描WiFi网络。这通常是因为Android系统限制或权限不足。\n\n请在系统设置中确保应用有"位置信息"和"附近的设备"权限，并设置为"始终允许"。',
-          onOpenSettings: _openAppSettings,
-        );
+        return;
       }
-    } catch (e) {
-      debugPrint('扫描WiFi时出错: $e');
+
+      // 开始扫描
+      final startScan = await WiFiScan.instance.startScan();
+      debugPrint('开始扫描: $startScan');
+
+      // 等待扫描完成
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 获取扫描结果
+      final scanResults = await WiFiScan.instance.getScannedResults();
+      
+      // 过滤包含xiaoxin或xiaozhi的WiFi网络（不区分大小写）
+      final filteredResults = scanResults.where((ap) {
+        final ssid = ap.ssid.toLowerCase();
+        return ssid.contains('xiaoxin') || ssid.contains('xiaozhi');
+      }).toList();
+      
+      debugPrint('过滤前WiFi数量: ${scanResults.length}, 过滤后WiFi数量: ${filteredResults.length}');
+      
+      // 去重处理
+      final uniqueNetworks = <String, WiFiAccessPoint>{};
+      for (var ap in filteredResults) {
+        final ssid = ap.ssid;
+        // 只保留信号最强的同名网络
+        if (ssid.isNotEmpty && (!uniqueNetworks.containsKey(ssid) || 
+            uniqueNetworks[ssid]!.level < ap.level)) {
+          uniqueNetworks[ssid] = ap;
+        }
+      }
+      
+      // 转换为列表并排序
+      final sortedNetworks = uniqueNetworks.values.toList();
+      
+      // 先按照是否是当前连接的网络排序，再按信号强度排序
+      sortedNetworks.sort((a, b) {
+        // 如果a是当前连接的网络，排在最前面
+        if (a.ssid == _currentConnectedSSID) return -1;
+        // 如果b是当前连接的网络，排在最前面
+        if (b.ssid == _currentConnectedSSID) return 1;
+        // 否则按信号强度排序
+        return b.level.compareTo(a.level);
+      });
+
       setState(() {
-        _errorMsg = '扫描WiFi时出错: $e';
+        _accessPoints = sortedNetworks;
+        _isScanning = false;
+      });
+    } catch (e) {
+      debugPrint('扫描WiFi出错: $e');
+      setState(() {
+        _errorMsg = '扫描WiFi出错: $e';
         _isScanning = false;
       });
     }
@@ -303,6 +287,7 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
   
   // 连接到WiFi
   Future<void> _connectToWifi(String ssid) async {
+    debugPrint('开始连接WiFi: $ssid');
     setState(() {
       _isConnecting = true;
       _selectedSSID = ssid;
@@ -310,53 +295,275 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
     });
     
     try {
+      // 检查WiFi是否需要密码
+      final needsPassword = _isWifiProtected(ssid);
+      debugPrint('WiFi $ssid 是否需要密码: $needsPassword');
+      
+      // 如果WiFi不需要密码，直接连接
+      if (!needsPassword) {
+        debugPrint('WiFi不需要密码，直接连接');
+        final result = await _wifiManager.connectToWifi(ssid, null);
+        debugPrint('WiFi连接结果: $result');
+        
+        if (result) {
+          // 连接成功，加载配置页面
+          debugPrint('WiFi连接成功，加载配置页面');
+          await _loadConfigPage();
+        } else {
+          debugPrint('WiFi连接失败');
+          setState(() {
+            _errorMsg = '无法连接到 $ssid';
+            _isConnecting = false;
+          });
+          // 连接失败后刷新WiFi列表
+          _scanWiFi();
+        }
+        return;
+      }
+      
+      // 如果WiFi需要密码，显示密码输入对话框
+      debugPrint('WiFi需要密码，显示密码输入对话框');
+      final password = await _showPasswordDialog(ssid);
+      debugPrint('用户输入密码: ${password != null ? "已输入" : "已取消"}');
+      
+      if (password == null) {
+        // 用户取消了输入密码
+        debugPrint('用户取消了密码输入，中止连接');
+        setState(() {
+          _isConnecting = false;
+        });
+        // 用户取消后刷新WiFi列表
+        _scanWiFi();
+        return;
+      }
+      
       // 连接到WiFi网络
-      final result = await _wifiManager.connectToWifi(ssid);
+      debugPrint('开始连接WiFi: $ssid, 密码: 已提供');
+      final result = await _wifiManager.connectToWifi(ssid, password);
+      debugPrint('WiFi连接结果: $result');
       
       if (result) {
         // 连接成功，加载配置页面
+        debugPrint('WiFi连接成功，加载配置页面');
         await _loadConfigPage();
       } else {
+        debugPrint('WiFi连接失败');
         setState(() {
           _errorMsg = '无法连接到 $ssid';
           _isConnecting = false;
         });
+        // 连接失败后刷新WiFi列表
+        _scanWiFi();
       }
     } catch (e) {
+      debugPrint('连接WiFi过程中出错: $e');
       setState(() {
         _errorMsg = '连接WiFi时出错: $e';
         _isConnecting = false;
       });
+      // 出错时也刷新WiFi列表
+      _scanWiFi();
     }
+  }
+  
+  // 判断WiFi是否受保护（需要密码）
+  bool _isWifiProtected(String ssid) {
+    try {
+      // 查找对应的WiFi接入点
+      final accessPoint = _accessPoints.firstWhere(
+        (ap) => ap.ssid == ssid,
+        orElse: () => throw Exception('未找到指定的WiFi网络'),
+      );
+      
+      // 检查安全类型
+      final capabilities = accessPoint.capabilities.toLowerCase();
+      debugPrint('WiFi $ssid 的安全类型: $capabilities');
+      
+      // 如果包含这些字符串，说明需要密码
+      final needsPassword = capabilities.contains('wpa') || 
+             capabilities.contains('wep') || 
+             capabilities.contains('psk') ||
+             capabilities.contains('wpa2') ||
+             capabilities.contains('wpa3');
+              
+      debugPrint('WiFi $ssid 是否需要密码: $needsPassword');
+      return needsPassword;
+    } catch (e) {
+      debugPrint('判断WiFi是否需要密码时出错: $e');
+      // 如果无法确定，默认需要密码更安全
+      return true;
+    }
+  }
+  
+  // 显示密码输入对话框
+  Future<String?> _showPasswordDialog(String ssid) async {
+    final passwordController = TextEditingController();
+    bool obscureText = true;
+    bool isConnecting = false;
+    
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 标题
+                Center(
+                  child: Text(
+                    '连接到 $ssid',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // 密码输入框
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscureText,
+                  decoration: InputDecoration(
+                    labelText: '密码',
+                    hintText: '请输入WiFi密码',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureText ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureText = !obscureText;
+                        });
+                      },
+                    ),
+                  ),
+                  enabled: !isConnecting,
+                ),
+                const SizedBox(height: 24),
+                
+                // 按钮
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 取消按钮
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: isConnecting
+                            ? null
+                            : () {
+                                Navigator.of(context).pop();
+                              },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // 连接按钮
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isConnecting
+                            ? null
+                            : () {
+                                setState(() {
+                                  isConnecting = true;
+                                });
+                                Navigator.of(context).pop(passwordController.text);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: isConnecting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text('连接'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
   
   // 加载配置页面
   Future<void> _loadConfigPage() async {
     try {
-      // 使用WebView加载设备配置页面
-      final deviceIp = await _wifiManager.getDeviceIp();
-      if (deviceIp != null) {
-        final url = 'http://$deviceIp';
-        
-        // 加载URL到WebView
-        await _webViewController.loadRequest(Uri.parse(url));
-        
-        setState(() {
-          _showWebView = true;
-          _isConnecting = false;
-        });
-      } else {
-        setState(() {
-          _errorMsg = '无法获取设备IP地址';
-          _isConnecting = false;
-        });
-      }
+      // 先更新UI状态，显示已连接
+      setState(() {
+        _isConnecting = false;
+        _connectionStatus = ConnectionStatus.connected;
+        _errorMsg = '已连接WiFi，正在打开配置页面...';
+      });
+      
+      // 连接成功后刷新WiFi列表
+      _scanWiFi();
+      
+      // 使用固定的设备IP地址192.168.4.1
+      const String deviceIp = '192.168.4.1';
+      
+      // 直接加载配置页面，不再检测是否存在
+      final url = 'http://$deviceIp';
+      debugPrint('直接加载配置页面: $url');
+      
+      // 加载URL到WebView
+      await _webViewController.loadRequest(Uri.parse(url));
+      
+      setState(() {
+        _showWebView = true;
+        _errorMsg = null;
+      });
     } catch (e) {
+      debugPrint('加载配置页面时出错: $e');
       setState(() {
         _errorMsg = '加载配置页面时出错: $e';
-        _isConnecting = false;
         _showWebView = false;
       });
+      
+      // 出错时也刷新WiFi列表
+      _scanWiFi();
+    }
+  }
+  
+  // 获取当前连接的WiFi
+  Future<void> _getCurrentWifi() async {
+    try {
+      final currentSsid = await _wifiManager.getCurrentWifiSSID();
+      setState(() {
+        _currentConnectedSSID = currentSsid;
+      });
+    } catch (e) {
+      debugPrint('获取当前WiFi时出错: $e');
     }
   }
   
@@ -364,124 +571,210 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WiFi配网'),
+        title: const Text('WiFi配网 (xiaoxin/xiaozhi)'),
         actions: [
-          // 刷新按钮
-          if (!_showWebView)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _isScanning ? null : _requestAllPermissionsAndScan,
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _requestAllPermissionsAndScan,
+          ),
         ],
       ),
       body: _buildBody(),
     );
   }
   
-  // 构建页面主体
   Widget _buildBody() {
     // 显示WebView
     if (_showWebView) {
       return Column(
         children: [
-          // 连接状态提示
           Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.green.shade100,
-            child: Row(
-              children: [
-                const Icon(Icons.wifi_lock, color: Colors.green),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('已连接到 $_selectedSSID，请在下方页面完成配置',
-                    style: const TextStyle(color: Colors.green)),
-                ),
-              ],
+            padding: const EdgeInsets.all(8.0),
+            color: Colors.green[100],
+            width: double.infinity,
+            child: Text(
+              '已连接到 $_selectedSSID，请在下方进行设备配置',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          // WebView显示设备配置页面
           Expanded(
             child: WebViewWidget(controller: _webViewController),
+          ),
+          // 配置完成按钮
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('配置完成'),
+            ),
           ),
         ],
       );
     }
-    
+
+    // 显示主界面（扫描结果或提示）
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStatusSection(),
+          const SizedBox(height: 16),
+          _buildNetworkList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusSection() {
     // 显示错误信息
-    if (_errorMsg != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 16),
-            Text(_errorMsg!, 
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _requestAllPermissionsAndScan,
-              child: const Text('重试'),
-            ),
-          ],
+    if (_errorMsg != null && _errorMsg!.isNotEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(8.0),
+        color: Colors.red[100],
+        width: double.infinity,
+        child: Text(
+          _errorMsg!,
+          style: const TextStyle(color: Colors.red),
         ),
       );
     }
-    
-    // 正在扫描
+
+    // 扫描状态
     if (_isScanning) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return Container(
+        padding: const EdgeInsets.all(8.0),
+        color: Colors.blue[100],
+        width: double.infinity,
+        child: const Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在扫描WiFi...'),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text('正在扫描WiFi网络...'),
           ],
         ),
       );
     }
-    
-    // 显示WiFi列表
-    return Column(
-      children: [
-        // 说明文字
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            '请选择设备发出的WiFi热点进行连接',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+
+    // 连接状态
+    if (_isConnecting) {
+      return Container(
+        padding: const EdgeInsets.all(8.0),
+        color: Colors.orange[100],
+        width: double.infinity,
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text('正在连接WiFi...'),
+          ],
         ),
-        
-        // WiFi列表
-        Expanded(
-          child: _accessPoints.isEmpty
-              ? const Center(child: Text('未找到设备热点'))
-              : ListView.builder(
-                  itemCount: _accessPoints.length,
-                  itemBuilder: (context, index) {
-                    final ap = _accessPoints[index];
-                    return ListTile(
-                      leading: const Icon(Icons.wifi),
-                      title: Text(ap.ssid),
-                      subtitle: Text('信号强度: ${ap.level} dBm'),
-                      trailing: _isConnecting && _selectedSSID == ap.ssid
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: _isConnecting
-                          ? null
-                          : () => _connectToWifi(ap.ssid),
-                    );
-                  },
-                ),
-        ),
-      ],
+      );
+    }
+
+    // 默认提示
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      color: Colors.grey[200],
+      width: double.infinity,
+      child: const Text('请选择包含xiaoxin或xiaozhi的WiFi网络'),
+    );
+  }
+  
+  // 构建WiFi列表
+  Widget _buildNetworkList() {
+    return Expanded(
+      child: _accessPoints.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.wifi_off, size: 48, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '未找到符合条件的WiFi',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '请确保设备已开启，并且WiFi名称包含xiaoxin或xiaozhi',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _requestAllPermissionsAndScan,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重新扫描'),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              itemCount: _accessPoints.length,
+              itemBuilder: (context, index) {
+                final ap = _accessPoints[index];
+                final ssid = ap.ssid;
+                final isProtected = _isWifiProtected(ssid);
+                final isCurrentConnected = ssid == _currentConnectedSSID;
+                
+                // 计算信号强度图标
+                IconData signalIcon;
+                if (ap.level >= -50) {
+                  signalIcon = Icons.signal_wifi_4_bar;
+                } else if (ap.level >= -70) {
+                  signalIcon = Icons.network_wifi;
+                } else {
+                  signalIcon = Icons.signal_wifi_0_bar;
+                }
+                
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  color: isCurrentConnected ? Colors.green[50] : null,
+                  child: ListTile(
+                    leading: Icon(
+                      signalIcon,
+                      color: isCurrentConnected ? Colors.green : Colors.blue,
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ssid,
+                            style: TextStyle(
+                              fontWeight: isCurrentConnected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        // 只对需要密码的WiFi显示锁图标，但已连接的WiFi不显示
+                        if (isProtected && !isCurrentConnected)
+                          const Icon(Icons.lock, size: 16, color: Colors.grey),
+                      ],
+                    ),
+                    subtitle: Text('信号强度: ${ap.level} dBm'),
+                    trailing: isCurrentConnected 
+                        ? null  // 已连接的WiFi不显示任何按钮
+                        : ElevatedButton(
+                            child: const Text('连接'),
+                            onPressed: _isConnecting
+                                ? null
+                                : () => _connectToWifi(ssid),
+                          ),
+                  ),
+                );
+              },
+            ),
     );
   }
 } 
